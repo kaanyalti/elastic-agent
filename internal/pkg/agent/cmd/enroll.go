@@ -351,6 +351,88 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+	fmt.Printf("======================== HAS ROOT: %v ========================\n", hasRoot)
+	if hasRoot {
+
+		binPath, err := os.Executable()
+		fmt.Printf("============================ BINPATH: %s ======================\n", binPath)
+		if err != nil {
+			return fmt.Errorf("failed to get binpath: %w", err)
+		}
+
+		owner, err := getFileOwner(binPath)
+		if err != nil {
+			return fmt.Errorf("failed to get file owner: %w", err)
+		}
+
+		curUser, err := getCurrentUser()
+		if err != nil {
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
+
+		isOwner, err := isFileOwner(curUser, owner)
+		if err != nil {
+			return fmt.Errorf("error while checking if current user is the file owner: %w", err)
+		}
+
+		if !isOwner {
+			execFunc, err := execWithFileOwnerFunc(owner, binPath)
+			if err != nil {
+				return fmt.Errorf("error getting exec func: %w", err)
+			}
+			return execFunc()
+		}
+
+		// get file owner
+		// check if file owner is root
+		// if not build command
+		// execute command
+		// fmt.Printf("======================= OS ARGS: %v ====================\n", os.Args[1:])
+		// binPath, err := os.Executable()
+		// fmt.Printf("============================ BINPATH: %s ======================\n", binPath)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to get binpath: %w", err)
+		// }
+		//
+		// fileInfo, err := os.Stat(binPath)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to get file info: %w", err)
+		// }
+		//
+		// if runtime.GOOS == "windows" {
+		// }
+		//
+		// stat, ok := fileInfo.Sys().(*syscall.Stat_t)
+		// fmt.Printf("============================== STAT: %+v ==============================\n", stat)
+		// if !ok {
+		// 	return fmt.Errorf("failed to get system specific file info: %w", err)
+		// }
+		//
+		// if stat.Uid != 0 {
+		// 	fmt.Printf("=================================== FILE DOES NOT BELONG TO ROOT =============================\n")
+		// 	cmd := exec.Command(binPath, os.Args[1:]...)
+		//
+		// 	fo := utils.FileOwner{
+		// 		UID: int(stat.Uid),
+		// 		GID: int(stat.Gid),
+		// 	}
+		//
+		// 	err := enrollCmdExtras(cmd, fo)
+		// 	if err != nil {
+		// 		return fmt.Errorf("error while setting enroll extras: %w", err)
+		// 	}
+		// 	cmd.Stdin = os.Stdin
+		// 	cmd.Stdout = os.Stdout
+		// 	cmd.Stderr = os.Stderr
+		// 	fmt.Printf("================================ RUNNING COMMAND =================================\n")
+		// 	return cmd.Run()
+		// }
+	}
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -525,7 +607,6 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		pathConfigFile,
 		store,
 	)
-
 	if err != nil {
 		return err
 	}
