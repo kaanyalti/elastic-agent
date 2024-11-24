@@ -369,15 +369,21 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return fmt.Errorf("failed to get file owner: %w", err)
 		}
 
+		fmt.Printf("====================== OWNER: %s ======================\n", owner)
+
 		curUser, err := getCurrentUser()
 		if err != nil {
 			return fmt.Errorf("failed to get current user: %w", err)
 		}
 
+		fmt.Printf("===================== CURRENT USER: %s ========================\n", curUser)
+
 		isOwner, err := isFileOwner(curUser, owner)
 		if err != nil {
 			return fmt.Errorf("error while checking if current user is the file owner: %w", err)
 		}
+
+		fmt.Printf("======================= IS OWNER: %v ============================\n", isOwner)
 
 		if !isOwner {
 			execFunc, err := execWithFileOwnerFunc(owner, binPath)

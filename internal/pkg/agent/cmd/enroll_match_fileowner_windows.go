@@ -4,8 +4,8 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"golang.org/x/sys/windows"
 )
 
@@ -23,6 +23,8 @@ func getFileOwner(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get security descriptor owner: %w", err)
 	}
+
+	fmt.Printf("=============== WINDOWS OWNER: %+v ===============\n", owner)
 	return owner.String(), nil
 }
 
@@ -42,6 +44,7 @@ func getCurrentUser() (string, error) {
 		return "", fmt.Errorf("failed to get token user: %w", err)
 	}
 
+	fmt.Printf("=============== CURRENT USER TOKEN: %+v =================\n", tokenUser)
 	return tokenUser.User.Sid.String(), nil
 }
 
@@ -62,8 +65,9 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 }
 
 func execWithFileOwnerFunc(fileOwner string, filePath string) (func() error, error) {
-	cmd := exec.Command("echo", "hello")
-	return cmd.Run, nil
+	// cmd := exec.Command("echo", "hello")
+	// return cmd.Run, nil
+	return func() error { return errors.New("test error") }, nil
 }
 
 // get file owner
