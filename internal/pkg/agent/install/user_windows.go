@@ -100,7 +100,6 @@ func FindUID(name string) (string, error) {
 }
 
 func SavePassword(pwd string) error {
-	fmt.Printf("====================== SAVING PASSWORD: %s =======================\n", pwd)
 	topPath := paths.Top()
 	file, err := os.Create(filepath.Join(topPath, "windows-password"))
 	if err != nil {

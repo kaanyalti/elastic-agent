@@ -43,7 +43,6 @@ func getFileOwner(filePath string) (string, error) {
 		return "", fmt.Errorf("failed to get security descriptor owner: %w", err)
 	}
 
-	fmt.Printf("=============== WINDOWS OWNER: %+v ===============\n", owner)
 	return owner.String(), nil
 }
 
@@ -72,7 +71,6 @@ func getCurrentUser() (string, error) {
 		return "", fmt.Errorf("failed to get token user: %w", err)
 	}
 
-	fmt.Printf("=============== CURRENT USER TOKEN: %+v =================\n", tokenUser)
 	return tokenUser.User.Sid.String(), nil
 }
 
@@ -90,7 +88,6 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	}
 
 	isEqual := fSid.Equals(cSid)
-	fmt.Printf("============================\nIS FILE OWNER: %+v\nIS FILE OWNER SECOND SID %+v\n IS EQUAL: %v\n =============================\n", cSid, fSid, isEqual)
 
 	return isEqual, nil
 }
@@ -98,18 +95,15 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 func windowsLogonUser(username string, domain string, password string, logonType uint32, logonProvider uint32) (windows.Token, error) {
 	var token windows.Token
 
-	fmt.Println("================ USER NAME POINTER ================")
 	usernamePtr, err := windows.UTF16PtrFromString(username)
 	if err != nil {
 		return 0, err
 	}
-	fmt.Println("================ DOMAIN POINTER ================")
 	domainPtr, err := windows.UTF16PtrFromString(domain)
 	if err != nil {
 		return 0, err
 	}
 
-	fmt.Println("================ PASSWORD POINTER ================")
 	passwordPtr, err := windows.UTF16PtrFromString(password)
 	if err != nil {
 		return 0, err
@@ -124,11 +118,9 @@ func windowsLogonUser(username string, domain string, password string, logonType
 		uintptr(unsafe.Pointer(&token)),
 	)
 
-	fmt.Printf("=============== CALL RETURN: %v ==============\n", ret)
 	if ret == 0 {
 		return 0, err
 	}
-	fmt.Printf("====================== TOKEN %+v ===================\n", token)
 	return token, nil
 }
 
@@ -145,7 +137,6 @@ func execWithFileOwnerFunc(fileOwner string, filePath string) (func() error, err
 	var domainNameLen uint32 = 256
 	var accountType uint32
 
-	fmt.Printf("================== GOING TO LOOKUP ACCOUNT BY SID: %+v =======================\n", sid)
 	err = windows.LookupAccountSid(
 		nil,
 		sid,
@@ -162,8 +153,6 @@ func execWithFileOwnerFunc(fileOwner string, filePath string) (func() error, err
 	username := windows.UTF16ToString(accountName[:accountNameLen]) // take what's relevant from the buffer
 	domain := windows.UTF16ToString(domainName[:domainNameLen])
 
-	fmt.Printf("======================== RESOLVED SID BELONGS TO: %s\\%s ==============================\n", domain, username)
-
 	binPath := paths.Top()
 
 	pwd, err := readPassword(filepath.Join(binPath, "windows-password"))
@@ -171,15 +160,11 @@ func execWithFileOwnerFunc(fileOwner string, filePath string) (func() error, err
 		return nil, fmt.Errorf("error while reading password: %w", err)
 	}
 
-	fmt.Printf("========================== READ PASSWORD: %s =====================\n", pwd)
-
-	fmt.Println("============================= GOING TO LOGON AS USER =============================")
 	token, err := windowsLogonUser(username, domain, pwd, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT)
 	if err != nil {
 		return nil, fmt.Errorf("error logging in as user: %w", err)
 	}
 
-	fmt.Println("============================= BUILDING COMMAND ==============================")
 	enrollCmd := exec.Command(binPath, os.Args[1:]...)
 
 	enrollCmd.SysProcAttr = &syscall.SysProcAttr{
@@ -192,9 +177,3 @@ func execWithFileOwnerFunc(fileOwner string, filePath string) (func() error, err
 
 	return func() error { return errors.New("test error") }, nil
 }
-
-// get file owner
-// check if file owner is root
-// if not build command
-// execute command
-//
