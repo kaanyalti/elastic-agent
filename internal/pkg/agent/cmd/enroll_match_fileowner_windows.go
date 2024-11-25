@@ -4,9 +4,28 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"syscall"
+	"unsafe"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"golang.org/x/sys/windows"
+)
+
+// Constants for LogonUser
+const (
+	LOGON32_LOGON_NETWORK     uint32 = 3
+	LOGON32_LOGON_INTERACTIVE        = 2
+	LOGON32_LOGON_BATCH              = 4
+	LOGON32_PROVIDER_DEFAULT         = 0
+)
+
+var (
+	advapi32       = windows.NewLazySystemDLL("advapi32.dll")
+	procLogonUserW = advapi32.NewProc("LogonUserW")
 )
 
 func getFileOwner(filePath string) (string, error) {
@@ -28,6 +47,15 @@ func getFileOwner(filePath string) (string, error) {
 	return owner.String(), nil
 }
 
+func readPassword(path string) (string, error) {
+	password, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("error while reading windows user password: %w", err)
+	}
+
+	return string(password), nil
+}
+
 // Helper to get the current user's SID
 func getCurrentUser() (string, error) {
 	// Get the token for the current process
@@ -38,7 +66,7 @@ func getCurrentUser() (string, error) {
 	}
 	defer token.Close()
 
-	// Get the token user
+	// Get the token use
 	tokenUser, err := token.GetTokenUser()
 	if err != nil {
 		return "", fmt.Errorf("failed to get token user: %w", err)
@@ -56,17 +84,112 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	}
 
 	var fSid *windows.SID
-	err = windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(curUser), &fSid)
+	err = windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(fileOwner), &fSid)
 	if err != nil {
 		return false, fmt.Errorf("failed to convert SID string to SID: %w", err)
 	}
 
-	return fSid.Equals(cSid), nil
+	isEqual := fSid.Equals(cSid)
+	fmt.Printf("============================\nIS FILE OWNER: %+v\nIS FILE OWNER SECOND SID %+v\n IS EQUAL: %v\n =============================\n", cSid, fSid, isEqual)
+
+	return isEqual, nil
+}
+
+func windowsLogonUser(username string, domain string, password string, logonType uint32, logonProvider uint32) (windows.Token, error) {
+	var token windows.Token
+
+	fmt.Println("================ USER NAME POINTER ================")
+	usernamePtr, err := windows.UTF16PtrFromString(username)
+	if err != nil {
+		return 0, err
+	}
+	fmt.Println("================ DOMAIN POINTER ================")
+	domainPtr, err := windows.UTF16PtrFromString(domain)
+	if err != nil {
+		return 0, err
+	}
+
+	fmt.Println("================ PASSWORD POINTER ================")
+	passwordPtr, err := windows.UTF16PtrFromString(password)
+	if err != nil {
+		return 0, err
+	}
+
+	ret, _, err := procLogonUserW.Call(
+		uintptr(unsafe.Pointer(usernamePtr)),
+		uintptr(unsafe.Pointer(domainPtr)),
+		uintptr(unsafe.Pointer(passwordPtr)),
+		uintptr(logonType),
+		uintptr(logonProvider),
+		uintptr(unsafe.Pointer(&token)),
+	)
+
+	fmt.Printf("=============== CALL RETURN: %v ==============\n", ret)
+	if ret == 0 {
+		return 0, err
+	}
+	fmt.Printf("====================== TOKEN %+v ===================\n", token)
+	return token, nil
 }
 
 func execWithFileOwnerFunc(fileOwner string, filePath string) (func() error, error) {
-	// cmd := exec.Command("echo", "hello")
-	// return cmd.Run, nil
+	var sid *windows.SID
+	err := windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(fileOwner), &sid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert SID string to SID: %w", err)
+	}
+
+	var accountName [256]uint16 // buffer to hold the account name
+	var domainName [256]uint16  // buffer to hold the domain name
+	var accountNameLen uint32 = 256
+	var domainNameLen uint32 = 256
+	var accountType uint32
+
+	fmt.Printf("================== GOING TO LOOKUP ACCOUNT BY SID: %+v =======================\n", sid)
+	err = windows.LookupAccountSid(
+		nil,
+		sid,
+		&accountName[0], // need the pointer to the start of the buffer
+		&accountNameLen,
+		&domainName[0], // need the pointer to the start of the buffer
+		&domainNameLen,
+		&accountType,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup account using SID: %w", err)
+	}
+
+	username := windows.UTF16ToString(accountName[:accountNameLen]) // take what's relevant from the buffer
+	domain := windows.UTF16ToString(domainName[:domainNameLen])
+
+	fmt.Printf("======================== RESOLVED SID BELONGS TO: %s\\%s ==============================\n", domain, username)
+
+	binPath := paths.Top()
+
+	pwd, err := readPassword(filepath.Join(binPath, "windows-password"))
+	if err != nil {
+		return nil, fmt.Errorf("error while reading password: %w", err)
+	}
+
+	fmt.Printf("========================== READ PASSWORD: %s =====================\n", pwd)
+
+	fmt.Println("============================= GOING TO LOGON AS USER =============================")
+	token, err := windowsLogonUser(username, domain, pwd, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT)
+	if err != nil {
+		return nil, fmt.Errorf("error logging in as user: %w", err)
+	}
+
+	fmt.Println("============================= BUILDING COMMAND ==============================")
+	enrollCmd := exec.Command(binPath, os.Args[1:]...)
+
+	enrollCmd.SysProcAttr = &syscall.SysProcAttr{
+		Token: syscall.Token(token),
+	}
+
+	enrollCmd.Stdin = os.Stdin
+	enrollCmd.Stdout = os.Stdout
+	enrollCmd.Stderr = os.Stderr
+
 	return func() error { return errors.New("test error") }, nil
 }
 

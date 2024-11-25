@@ -11,10 +11,13 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/winlabs/gowin32"
 	"golang.org/x/sys/windows"
 )
@@ -96,8 +99,22 @@ func FindUID(name string) (string, error) {
 	return sid.String(), nil
 }
 
+func SavePassword(pwd string) error {
+	fmt.Printf("====================== SAVING PASSWORD: %s =======================\n", pwd)
+	topPath := paths.Top()
+	file, err := os.Create(filepath.Join(topPath, "windows-password"))
+	if err != nil {
+		return fmt.Errorf("error creating file to save windows password: %w", err)
+	}
+	defer file.Close()
+	_, err = file.Write([]byte(pwd))
+	if err != nil {
+		return fmt.Errorf("error writing windows password to file: %w", err)
+	}
+	return nil
+}
+
 // CreateUser creates a user on the machine.
-//
 // User is created without interactive rights, no logon rights, and only service rights.
 func CreateUser(name string, _ string) (string, error) {
 	var parmErr uint32
@@ -105,6 +122,12 @@ func CreateUser(name string, _ string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random password: %w", err)
 	}
+
+	err = SavePassword(password)
+	if err != nil {
+		return "", fmt.Errorf("error saving password for user: %w", err)
+	}
+
 	info := USER_INFO_1{
 		Usri1_priv:  USER_PRIV_USER,
 		Usri1_flags: USER_UF_SCRIPT | USER_UF_NORMAL_ACCOUNT | USER_UF_DONT_EXPIRE_PASSWD,
