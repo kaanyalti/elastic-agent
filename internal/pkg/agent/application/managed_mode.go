@@ -68,6 +68,7 @@ func newManagedConfigManager(
 	topPath string,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
+	log.Info("INSIDE newManagedConfigManager")
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
 		return nil, errors.New(err,
@@ -140,7 +141,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	}
 	retrier := retrier.New(ack, m.log)
 	batchedAcker := lazy.NewAcker(ack, m.log, lazy.WithRetrier(retrier))
-	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
+	actionAcker := store.NewStateStoreActionAcker(m.log, batchedAcker, m.stateStore)
 
 	if err := m.coord.AckUpgrade(ctx, actionAcker); err != nil {
 		m.log.Warnf("Failed to ack upgrade: %v", err)
@@ -274,7 +275,6 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
-
 	if m.fleetInitTimeout == 0 {
 		m.fleetInitTimeout = 30 * time.Second
 	}
@@ -354,6 +354,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionPolicyReassign{},
 		handlers.NewPolicyReassign(m.log),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionRestart{},
+		handlers.NewRestart(m.log, m.coord),
 	)
 
 	m.dispatcher.MustRegister(

@@ -75,7 +75,8 @@ func NewStateStoreWithMigration(
 	log *logger.Logger,
 	actionStorePath,
 	stateStorePath string,
-	storageOpts ...storage.EncryptedOptionFunc) (*StateStore, error) {
+	storageOpts ...storage.EncryptedOptionFunc,
+) (*StateStore, error) {
 	stateDiskStore, err := storage.NewEncryptedDiskStore(
 		ctx, stateStorePath, storageOpts...)
 	if err != nil {
@@ -90,7 +91,8 @@ func NewStateStoreWithMigration(
 func newStateStoreWithMigration(
 	log *logger.Logger,
 	actionStorePath string,
-	stateStore storage.Storage) (*StateStore, error) {
+	stateStore storage.Storage,
+) (*StateStore, error) {
 	err := migrateActionStoreToStateStore(log, actionStorePath, stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("failed migrating action store to YAML state store: %w",
@@ -107,12 +109,13 @@ func newStateStoreWithMigration(
 }
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
-func NewStateStoreActionAcker(acker acker.Acker, store *StateStore) *StateStoreActionAcker {
-	return &StateStoreActionAcker{acker: acker, store: store}
+func NewStateStoreActionAcker(log *logger.Logger, acker acker.Acker, store *StateStore) *StateStoreActionAcker {
+	return &StateStoreActionAcker{log: log, acker: acker, store: store}
 }
 
 // NewStateStore creates a new state store.
 func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
+	log.Info("Inside NewStateStore")
 	// If the store exists we will read it, if an error is returned we log it
 	// and return an empty store.
 	reader, err := store.Load()
@@ -122,7 +125,7 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 	}
 	defer reader.Close()
 
-	st, err := readState(reader)
+	st, err := readState(reader, log)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse store content: %w", err)
 	}
@@ -143,7 +146,7 @@ func NewStateStore(log *logger.Logger, store saveLoader) (*StateStore, error) {
 // readState parsed the content from reader as JSON to state.
 // It's mostly to abstract the parsing of the data so different functions can
 // reuse this.
-func readState(reader io.ReadCloser) (state, error) {
+func readState(reader io.ReadCloser, log *logger.Logger) (state, error) {
 	st := state{}
 
 	data, err := io.ReadAll(reader)
@@ -155,6 +158,8 @@ func readState(reader io.ReadCloser) (state, error) {
 		// empty file
 		return state{Version: "1"}, nil
 	}
+
+	log.Infof("Inside readState. The state is %s\n", data)
 
 	err = json.Unmarshal(data, &st)
 	if err != nil {
@@ -293,6 +298,7 @@ func (s *StateStore) AckToken() string {
 type StateStoreActionAcker struct {
 	acker acker.Acker
 	store *StateStore
+	log   *logger.Logger
 }
 
 // Ack acks the action using underlying acker.

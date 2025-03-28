@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // saver is the minimal interface needed for state storage.
@@ -30,8 +31,9 @@ type queue []*item
 
 // ActionQueue is a priority queue with the ability to persist to disk.
 type ActionQueue struct {
-	q *queue
-	s saver
+	q   *queue
+	s   saver
+	log *logger.Logger
 }
 
 // Len returns the length of the queue
@@ -92,14 +94,15 @@ func newQueue(actions []fleetapi.ScheduledAction) (*queue, error) {
 }
 
 // NewActionQueue creates a new queue with the passed actions using the saver for state storage.
-func NewActionQueue(actions []fleetapi.ScheduledAction, s saver) (*ActionQueue, error) {
+func NewActionQueue(actions []fleetapi.ScheduledAction, s saver, log *logger.Logger) (*ActionQueue, error) {
 	q, err := newQueue(actions)
 	if err != nil {
 		return nil, err
 	}
 	return &ActionQueue{
-		q: q,
-		s: s,
+		q:   q,
+		s:   s,
+		log: log,
 	}, nil
 }
 

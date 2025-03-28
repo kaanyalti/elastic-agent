@@ -34,6 +34,7 @@ const (
 	ActionTypeCancel = "CANCEL"
 	// ActionTypeDiagnostics specifies a diagnostics action.
 	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
+	ActionTypeRestart     = "RESTART"
 )
 
 // Error values that the Action interface can return
@@ -115,6 +116,8 @@ func NewAction(actionType string) Action {
 		action = &ActionUnenroll{}
 	case ActionTypeUpgrade:
 		action = &ActionUpgrade{}
+	case ActionTypeRestart:
+		action = &ActionRestart{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
@@ -173,6 +176,32 @@ func (a *ActionUnknown) AckEvent() AckEvent {
 		Message:   fmt.Sprintf("Action %q of type %q acknowledged.", a.ActionID, a.ActionType),
 		Error:     fmt.Sprintf("Action %q of type %q is unknown to the elastic-agent", a.ActionID, a.OriginalType),
 	}
+}
+
+type ActionRestart struct {
+	ActionID   string `json:"id" yaml:"id"`
+	ActionType string `json:"type" yaml:"type"`
+}
+
+func (a *ActionRestart) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionRestart) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionRestart) ID() string {
+	return a.ActionID
+}
+
+func (a *ActionRestart) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionPolicyReassign is a request to apply a new policy

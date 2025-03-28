@@ -22,8 +22,8 @@ var ErrInvalidYAML = errors.New("could not parse YAML")
 func migrateActionStoreToStateStore(
 	log *logger.Logger,
 	actionStorePath string,
-	stateDiskStore storage.Storage) (err error) {
-
+	stateDiskStore storage.Storage,
+) (err error) {
 	log = log.Named("state_migration")
 	actionDiskStore, err := storage.NewDiskStore(actionStorePath)
 	if err != nil {
@@ -131,7 +131,7 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 		return fmt.Errorf("could not read store content: %w", err)
 	}
 
-	st, err := readState(reader)
+	st, err := readState(reader, log)
 	// close it as soon as possible and before the next store save
 	_ = reader.Close()
 	if err == nil {
@@ -159,7 +159,8 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 			ActionID:   yamlStore.Action.ActionID,
 			ActionType: yamlStore.Action.Type,
 			Data: fleetapi.ActionPolicyChangeData{
-				Policy: conv.YAMLMapToJSONMap(yamlStore.Action.Policy)},
+				Policy: conv.YAMLMapToJSONMap(yamlStore.Action.Policy),
+			},
 		}
 		// Unenroll action is supported for completeness as an unenrolled agent
 		// would not be upgraded.
