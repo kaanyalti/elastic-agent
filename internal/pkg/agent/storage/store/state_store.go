@@ -110,6 +110,7 @@ func newStateStoreWithMigration(
 
 // NewStateStoreActionAcker creates a new state store backed action acker.
 func NewStateStoreActionAcker(log *logger.Logger, acker acker.Acker, store *StateStore) *StateStoreActionAcker {
+	log.Info("New StateStoreActionAcker")
 	return &StateStoreActionAcker{log: log, acker: acker, store: store}
 }
 
@@ -172,6 +173,7 @@ func readState(reader io.ReadCloser, log *logger.Logger) (state, error) {
 // SetAction sets the current action. It accepts ActionPolicyChange or
 // ActionUnenroll. Any other type will be silently discarded.
 func (s *StateStore) SetAction(a fleetapi.Action) {
+	s.log.Infof("StateStore SetAction action: %+v\n", a)
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
@@ -199,7 +201,7 @@ func (s *StateStore) SetAction(a fleetapi.Action) {
 		s.dirty = true
 		s.state.ActionSerializer.Action = a
 	default:
-		s.log.Debugw("trying to set invalid action type on the state store, ignoring the action",
+		s.log.Infow("trying to set invalid action type on the state store, ignoring the action",
 			"action.type", a.Type(),
 			"action.id", a.ID())
 	}
@@ -228,6 +230,7 @@ func (s *StateStore) SetQueue(q []fleetapi.ScheduledAction) {
 // Save saves the actions into the state store. If the action type is not
 // supported or if any error happens, it returns a non-nil error.
 func (s *StateStore) Save() (err error) {
+	s.log.Infof("StateStore Save action: %+v\n", s.state.ActionSerializer.Action)
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
@@ -305,6 +308,7 @@ type StateStoreActionAcker struct {
 // After the action is acked it is stored in the StateStore. The StateStore
 // decides if the action needs to be persisted or not.
 func (a *StateStoreActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	a.log.Infof("State store acker action: %+v\n", action)
 	if err := a.acker.Ack(ctx, action); err != nil {
 		return err
 	}

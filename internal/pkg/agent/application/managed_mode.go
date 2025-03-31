@@ -83,7 +83,7 @@ func newManagedConfigManager(
 		return nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
 	}
 
-	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
+	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore, log)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}

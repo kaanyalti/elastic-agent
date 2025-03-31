@@ -32,12 +32,13 @@ func (h *Restart) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ack
 
 	h.log.Debugf("handlerRestart: action '%+v' received", a)
 
-	if err := acker.Ack(ctx, a); err != nil {
-		h.log.Errorf("failed to acknowledge RESTART action with id '%s'", a.ID)
-	} else if err := acker.Commit(ctx); err != nil {
-		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", a.ID)
-	}
+	// if err := acker.Ack(ctx, a); err != nil {
+	// 	h.log.Errorf("failed to acknowledge RESTART action with id '%s'", a.ID)
+	// } else if err := acker.Commit(ctx); err != nil {
+	// 	h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", a.ID)
+	// }
 
+	h.log.Infof("===== RESTART action is not going to be acked =====\n")
 	h.log.Infof("===== RESTART action is handled =====\n")
 
 	h.log.Infof("===== restarting the agent =====\n")

@@ -239,6 +239,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 			f.errCh <- nil
 		}
 
+		f.log.Infof("Got checkin response: %+v\n", resp)
 		// Request was successful, return the collected actions.
 		return resp, nil
 	}

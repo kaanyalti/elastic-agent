@@ -49,6 +49,7 @@ type Retrier struct {
 
 // New creates new instance of retrier
 func New(acker BatchAcker, log *logger.Logger, opts ...Option) *Retrier {
+	log.Info("New retrier")
 	r := &Retrier{
 		acker:                acker,
 		log:                  log,
@@ -106,6 +107,7 @@ func (r *Retrier) Run(ctx context.Context) {
 
 // Enqueue enqueue provided actions for the next retry
 func (r *Retrier) Enqueue(actions []fleetapi.Action) {
+	r.log.Infof("Enqueueing actions: %+v\n", actions)
 	if len(actions) == 0 {
 		return
 	}
@@ -122,7 +124,7 @@ func (r *Retrier) Enqueue(actions []fleetapi.Action) {
 }
 
 func (r *Retrier) runRetries(ctx context.Context) {
-	r.log.Debug("ack retrier: enter retry loop")
+	r.log.Info("ack retrier: enter retry loop")
 
 	// Map tracking the number of retries per action, where the key is action ID and the value is the number of retries left per action
 	retries := make(map[string]int)

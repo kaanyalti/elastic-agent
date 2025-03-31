@@ -35,6 +35,7 @@ type Option func(f *Acker)
 
 // NewAcker creates a new lazy acker.
 func NewAcker(baseAcker batchAcker, log *logger.Logger, opts ...Option) *Acker {
+	log.Info("New lazy acker")
 	f := &Acker{
 		acker: baseAcker,
 		queue: make([]fleetapi.Action, 0),
@@ -57,6 +58,7 @@ func WithRetrier(r retrier) Option {
 
 // Ack acknowledges action.
 func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
+	f.log.Infof("Lazy acker acking: %+v\n", action)
 	span, ctx := apm.StartSpan(ctx, "ack", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -68,6 +70,7 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 
 // Commit commits ack actions.
 func (f *Acker) Commit(ctx context.Context) (err error) {
+	f.log.Info("Lazy acker Commit")
 	span, ctx := apm.StartSpan(ctx, "commit", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -80,10 +83,9 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 	actions := f.queue
 	f.queue = make([]fleetapi.Action, 0)
 
-	f.log.Debugf("lazy acker: ack batch: %s", actions)
+	f.log.Infof("lazy acker: ack batch: %s", actions)
 	var resp *fleetapi.AckResponse
 	resp, err = f.acker.AckBatch(ctx, actions)
-
 	// If request failed enqueue all actions with retrier if it is set
 	if err != nil {
 		if f.retrier != nil {
@@ -116,6 +118,7 @@ func (f *Acker) Commit(ctx context.Context) (err error) {
 }
 
 func (f *Acker) enqueue(action fleetapi.Action) {
+	f.log.Infof("Lazy acker enqueue action: %+v\n", action)
 	for _, a := range f.queue {
 		if a.ID() == action.ID() {
 			f.log.Debugf("action with id '%s' has already been queued", action.ID())

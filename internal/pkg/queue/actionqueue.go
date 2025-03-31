@@ -110,6 +110,7 @@ func NewActionQueue(actions []fleetapi.ScheduledAction, s saver, log *logger.Log
 // The priority is meant to be the start-time of the action as a unix epoch time.
 // Complexity: O(log n)
 func (q *ActionQueue) Add(action fleetapi.ScheduledAction, priority int64) {
+	q.log.Infof("Action queue adding action: %+v type %T\n", action, action)
 	e := &item{
 		action:   action,
 		priority: priority,

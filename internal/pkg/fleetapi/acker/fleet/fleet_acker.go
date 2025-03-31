@@ -37,6 +37,7 @@ func NewAcker(
 	agentInfo agentInfo,
 	client client.Sender,
 ) (*Acker, error) {
+	log.Info("New fleet acker")
 	return &Acker{
 		log:       log,
 		client:    client,
@@ -51,6 +52,7 @@ func (f *Acker) SetClient(c client.Sender) {
 
 // Ack acknowledges action.
 func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
+	f.log.Infof("Fleet acker acking action: %+v\n", action)
 	span, ctx := apm.StartSpan(ctx, "ack", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -78,7 +80,7 @@ func (f *Acker) Ack(ctx context.Context, action fleetapi.Action) (err error) {
 
 // AckBatch acknowledges multiple actions at once.
 func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *fleetapi.AckResponse, err error) {
-	f.log.Debugf("fleet acker: ackbatch, actions: %#v", actions)
+	f.log.Infof("fleet acker: ackbatch, actions: %#v", actions)
 	span, ctx := apm.StartSpan(ctx, "ackBatch", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -96,7 +98,7 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 		ids = append(ids, action.ID())
 	}
 
-	f.log.Debugf("fleet acker: ackbatch, events: %#v", events)
+	f.log.Infof("fleet acker: ackbatch, events: %#v", events)
 	if len(events) == 0 {
 		// no events to send (nothing to do)
 		return &fleetapi.AckResponse{}, nil
@@ -107,7 +109,7 @@ func (f *Acker) AckBatch(ctx context.Context, actions []fleetapi.Action) (res *f
 		Events: events,
 	}
 
-	f.log.Debugf("%d actions with ids '%s' acknowledging", len(ids), strings.Join(ids, ","))
+	f.log.Infof("%d actions with ids '%s' acknowledging", len(ids), strings.Join(ids, ","))
 
 	res, err = cmd.Execute(ctx, req)
 	if err != nil {
