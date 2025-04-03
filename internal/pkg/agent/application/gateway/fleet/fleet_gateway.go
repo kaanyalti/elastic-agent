@@ -159,7 +159,7 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 			f.log.Info("Fleet gateway stopped")
 			return ctx.Err()
 		case <-f.scheduler.WaitTick():
-			f.log.Debug("FleetGateway calling Checkin API")
+			f.log.Info("FleetGateway calling Checkin API")
 
 			// Execute the checkin call and for any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some

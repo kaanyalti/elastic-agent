@@ -26,13 +26,14 @@ func NewPolicyReassign(log *logger.Logger) *PolicyReassign {
 
 // Handle handles POLICY_REASSIGN action.
 func (h *PolicyReassign) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
-	h.log.Debugf("handlerPolicyReassign: action '%+v' received", a)
+	h.log.Infof("handlerPolicyReassign: action '%+v' received", a)
 
-	if err := acker.Ack(ctx, a); err != nil {
-		h.log.Errorf("failed to acknowledge POLICY_REASSIGN action with id '%s'", a.ID)
-	} else if err := acker.Commit(ctx); err != nil {
-		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", a.ID)
-	}
+	h.log.Info("POLICY REASSIGN IS NOT GOING TO BE ACKED")
+	// if err := acker.Ack(ctx, a); err != nil {
+	// 	h.log.Errorf("failed to acknowledge POLICY_REASSIGN action with id '%s'", a.ID)
+	// } else if err := acker.Commit(ctx); err != nil {
+	// 	h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", a.ID)
+	// }
 
 	return nil
 }

@@ -32,6 +32,17 @@ func (h *Restart) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ack
 
 	h.log.Debugf("handlerRestart: action '%+v' received", a)
 
+	// TODO:
+	// * Save the action somewhere (state store potentially, restart marker)
+	// * Need access to the state store update the NewRestart function and the
+	// managedmode
+	// * Create restart marker
+	// * save action info
+	// * Do the ReExec
+	// * Read restart marker
+	// * ack and commit
+	// * delete marker
+
 	// if err := acker.Ack(ctx, a); err != nil {
 	// 	h.log.Errorf("failed to acknowledge RESTART action with id '%s'", a.ID)
 	// } else if err := acker.Commit(ctx); err != nil {
