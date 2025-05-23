@@ -350,6 +350,23 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	// Set state to starting
 	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
 
+	go func(ctx context.Context, s *serviceRuntime) {
+		s.log.Info("======================== STARTING SERVICE ========================")
+		s.log.Infof("Service name: %s\n", s.name())
+		s.log.Infof("Service status: %+v\n", s.state)
+		s.log.Info("==================================================================")
+		for {
+			select {
+			case st := <-s.statusCh:
+				s.log.Info("#######################################")
+				s.log.Infof("Received service status %s\n", string(st))
+				s.log.Info("#######################################")
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx, s)
+
 	// Call the check command of the service
 	s.log.Infof("check if %s service is installed", name)
 	err = s.check(ctx)
