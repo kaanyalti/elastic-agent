@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/core/constants"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
@@ -60,21 +61,26 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 		log.Warnf("failed to detect Administrator: %w", err)
 		isAdmin = false // just in-case to ensure that in error case that its always false
 	}
-	// SYSTEM/Administrators can always talk over the pipe, even when not running as privileged
-	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
+	// SYSTEM/Administrators can always talk over the pipe
 	descriptor += "(A;;GA;;;" + utils.AdministratorSID + ")"
-	if !isAdmin && paths.RunningInstalled() {
-		// Windows doesn't provide a way to set the executing group when being executed as a service,
-		// but a group needs to be added to the named pipe in unprivileged mode to allow users in the group
-		// to ability to communicate with the named pipe.
-		//
-		// During installation a group is set as the owner of the files which can be used here to determine
-		// the group that should be added to the named pipe.
-		gid, err := pathGID(paths.Top())
+
+	// Only add elastic-agent group permissions if:
+	// 1. Running as admin (command is started by admin)
+	// 2. Agent is installed (RunningInstalled is true)
+	// 3. Agent is running as elastic-agent user
+	if isAdmin && paths.RunningInstalled() {
+		// Check if the agent is running as elastic-agent user
+		agentUser, err := user.Lookup(constants.ElasticUsername)
 		if err != nil {
-			// do not fail, agent would end up in a loop, continue with limited permissions
-			log.Warnf("failed to detect group: %w", err)
-		} else {
+			return "", fmt.Errorf("failed to lookup elastic-agent user: %w", err)
+		}
+
+		if agentUser.Uid == u.Uid {
+			// Add elastic-agent group permissions only if running as elastic-agent-user
+			gid, err := pathGID(paths.Top())
+			if err != nil {
+				return "", fmt.Errorf("failed to detect group: %w", err)
+			}
 			descriptor += "(A;;GA;;;" + gid + ")"
 		}
 	}

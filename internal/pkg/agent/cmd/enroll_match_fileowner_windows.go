@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user.")
@@ -73,6 +74,15 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 
 // Checks if the provided file is owned by the user that initiated the process
 func isOwnerExec(filePath string) (bool, error) {
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return false, fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+
+	if hasRoot {
+		return true, nil
+	}
+
 	fileOwner, err := getFileOwner(filePath)
 	if err != nil {
 		return false, fmt.Errorf("getting file owner: %w", err)
