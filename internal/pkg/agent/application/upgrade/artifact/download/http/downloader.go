@@ -109,7 +109,6 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	// download from source to dest
 	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
-	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
@@ -207,6 +206,17 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		if length, err := strconv.Atoi(contentLength); err == nil {
 			fileSize = length
 		}
+	}
+
+	available, _, err := download.CheckDiskSpace(filepath.Dir(fullPath))
+	if err != nil {
+		e.log.Warnf("failed to check disk space for %s: %v", filepath.Dir(fullPath), err)
+		return "", err
+	}
+
+	if fileSize > 0 && available < uint64(fileSize)*2 {
+		e.log.Warnf("insufficient disk space: available=%d, required~=%d for %s", available, fileSize*2, filename)
+		return "", errors.New(fmt.Sprintf("insufficient disk space for %s: available=%d, required~=%d", filename, available, fileSize*2), errors.TypeFilesystem)
 	}
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
