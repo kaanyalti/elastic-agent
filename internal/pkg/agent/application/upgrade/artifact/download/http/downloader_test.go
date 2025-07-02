@@ -65,6 +65,7 @@ func TestDownload(t *testing.T) {
 
 			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+			testClient.checkDiskSpace = func(_ *logger.Logger, _ string) (uint64, error) { return 1 << 30, nil }
 			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
@@ -115,6 +116,7 @@ func TestDownloadBodyError(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
+	testClient.checkDiskSpace = func(_ *logger.Logger, _ string) (uint64, error) { return 1 << 30, nil }
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	if err == nil {
@@ -172,6 +174,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
+	testClient.checkDiskSpace = func(_ *logger.Logger, _ string) (uint64, error) { return 1 << 30, nil }
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
@@ -255,6 +258,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
+	testClient.checkDiskSpace = func(_ *logger.Logger, _ string) (uint64, error) { return 1 << 30, nil }
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
@@ -517,6 +521,7 @@ func TestDownloadVersion(t *testing.T) {
 			config.SourceURI = server.URL
 			config.TargetDirectory = targetDirPath
 			downloader := NewDownloaderWithClient(log, config, *elasticClient, upgradeDetails)
+			downloader.checkDiskSpace = func(_ *logger.Logger, _ string) (uint64, error) { return 1 << 30, nil }
 
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 

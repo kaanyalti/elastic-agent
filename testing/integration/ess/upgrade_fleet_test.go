@@ -126,6 +126,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool,
 	// Upgrade to a different build but of the same version (always a snapshot).
 	// In the case there is not a different build then the test is skipped.
 	// Fleet doesn't allow a downgrade to occur, so we cannot go to a lower version.
+	t.Logf("[Test] Preparing endFixture for upgrade version: %s", upgradetest.EnsureSnapshot(define.Version()))
 	endFixture, err := atesting.NewFixture(
 		t,
 		upgradetest.EnsureSnapshot(define.Version()),
@@ -133,8 +134,10 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool,
 	)
 	require.NoError(t, err)
 
+	t.Logf("[Test] Calling endFixture.Prepare to fetch and extract artifact")
 	err = endFixture.Prepare(ctx)
 	require.NoError(t, err)
+	t.Logf("[Test] endFixture prepared, artifact should be ready")
 
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err)
@@ -144,6 +147,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool,
 			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
 	}
 
+	t.Logf("[Test] Triggering managed upgrade via Fleet")
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
@@ -606,6 +610,7 @@ func PerformManagedUpgrade(
 			return fmt.Errorf("PostWatcherSuccessHook failed: %w", err)
 		}
 	}
+	require.True(t, false, "forcing failure")
 	return nil
 }
 

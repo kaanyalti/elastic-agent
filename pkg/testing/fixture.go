@@ -963,6 +963,7 @@ func (f *Fixture) binaryPath() string {
 }
 
 func (f *Fixture) fetch(ctx context.Context) (string, error) {
+	f.t.Logf("[Fixture] Fetching artifact for version=%s, os=%s, arch=%s, format=%s", f.version, f.operatingSystem, f.architecture, f.packageFormat)
 	cache := f.getFetcherCache()
 	cache.mx.Lock()
 	defer cache.mx.Unlock()
@@ -986,6 +987,7 @@ func (f *Fixture) fetch(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	f.t.Logf("[Fixture] Artifact ready at %s", path)
 	return path, nil
 }
 

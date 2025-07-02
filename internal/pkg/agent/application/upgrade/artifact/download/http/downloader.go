@@ -41,7 +41,12 @@ const (
 	// warningProgressIntervalPercentage defines how often to log messages as a warning once the amount of time
 	// passed is this percentage or more of the total allotted time to download.
 	warningProgressIntervalPercentage = 0.75
+
+	// template for insufficient disk space errors and logs
+	insufficientDiskSpaceMsg = "insufficient disk space for %s: available=%d, required~=%d"
 )
+
+type DiskSpaceChecker func(log *logger.Logger, path string) (uint64, error)
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
@@ -49,6 +54,7 @@ type Downloader struct {
 	config         *artifact.Config
 	client         http.Client
 	upgradeDetails *details.Details
+	checkDiskSpace DiskSpaceChecker
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -72,6 +78,7 @@ func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client
 		config:         config,
 		client:         client,
 		upgradeDetails: upgradeDetails,
+		checkDiskSpace: download.CheckDiskSpace,
 	}
 }
 
@@ -107,6 +114,10 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
+	filename, _ := artifact.GetArtifactName(a, *version, e.config.OS(), e.config.Arch())
+	fullPath, _ := artifact.GetArtifactPath(a, *version, e.config.OS(), e.config.Arch(), e.config.TargetDirectory)
+	e.log.Infof("[Agent Downloader] Attempting to download artifact: %s to %s", filename, fullPath)
+
 	// download from source to dest
 	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
 	if err != nil {
@@ -115,6 +126,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
 	downloadedFiles = append(downloadedFiles, hashPath)
+	e.log.Infof("[Agent Downloader] Downloaded artifact to %s", path)
 	return path, err
 }
 
@@ -167,6 +179,13 @@ func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, op
 }
 
 func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (string, error) {
+	e.log.Infof("[Downloader] Starting downloadFile: artifactName=%s, filename=%s, fullPath=%s", artifactName, filename, fullPath)
+	e.log.Infof("[Agent Downloader] Checking if artifact exists at %s", fullPath)
+	if _, err := os.Stat(fullPath); err == nil {
+		e.log.Infof("[Agent Downloader] Artifact already exists at %s, skipping download", fullPath)
+		return fullPath, nil
+	}
+
 	sourceURI, err := e.composeURI(artifactName, filename)
 	if err != nil {
 		return "", err
@@ -201,22 +220,34 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		return fullPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
+	// Content-Length check and logging
+	contentLengthHeader := resp.Header.Get("Content-Length")
+	e.log.Infof("[Downloader] Content-Length header: %s", contentLengthHeader)
 	fileSize := -1
-	if contentLength := resp.Header.Get("Content-Length"); contentLength != "" {
-		if length, err := strconv.Atoi(contentLength); err == nil {
+	if contentLengthHeader != "" {
+		length, err := strconv.Atoi(contentLengthHeader)
+		if err != nil {
+			e.log.Warnf("[Downloader] Failed to parse Content-Length header '%s': %v", contentLengthHeader, err)
+		} else {
 			fileSize = length
+			e.log.Infof("[Downloader] Parsed Content-Length as fileSize: %d bytes", fileSize)
 		}
+	} else {
+		e.log.Infof("[Downloader] No Content-Length header present; fileSize remains unset")
 	}
 
-	available, _, err := download.CheckDiskSpace(filepath.Dir(fullPath))
+	e.log.Infof("[Downloader] Checking disk space at path: %s", fullPath)
+	available, err := e.checkDiskSpace(e.log, filepath.Dir(fullPath))
 	if err != nil {
-		e.log.Warnf("failed to check disk space for %s: %v", filepath.Dir(fullPath), err)
-		return "", err
+		e.log.Errorf("[Downloader] Error checking disk space at %s: %v", fullPath, err)
+	} else {
+		e.log.Infof("[Downloader] Available disk space at %s: %d bytes", fullPath, available)
 	}
 
 	if fileSize > 0 && available < uint64(fileSize)*2 {
-		e.log.Warnf("insufficient disk space: available=%d, required~=%d for %s", available, fileSize*2, filename)
-		return "", errors.New(fmt.Sprintf("insufficient disk space for %s: available=%d, required~=%d", filename, available, fileSize*2), errors.TypeFilesystem)
+		errString := fmt.Sprintf(insufficientDiskSpaceMsg, filename, available, fileSize*2)
+		e.log.Errorf(errString)
+		return "", errors.New(errString)
 	}
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
@@ -231,5 +262,6 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 	dp.ReportComplete()
 
+	e.log.Infof("[Agent Downloader] Completed download to %s", fullPath)
 	return fullPath, nil
 }

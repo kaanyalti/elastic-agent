@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -25,15 +26,21 @@ const (
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
+	log      *logger.Logger
 	dropPath string
 	config   *artifact.Config
 }
 
 // NewDownloader creates and configures Elastic Downloader
 func NewDownloader(config *artifact.Config) *Downloader {
+	log, err := logger.New("agent-fs-downloader", true)
+	if err != nil {
+		panic(err)
+	}
 	return &Downloader{
 		config:   config,
 		dropPath: getDropPath(config),
+		log:      log,
 	}
 }
 
@@ -52,6 +59,10 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
+	filename, _ := artifact.GetArtifactName(a, *version, e.config.OS(), e.config.Arch())
+	fullPath, _ := artifact.GetArtifactPath(a, *version, e.config.OS(), e.config.Arch(), e.config.TargetDirectory)
+	e.log.Infof("[Agent FS Downloader] Attempting to download artifact: %s to %s", filename, fullPath)
+
 	// download from source to dest
 	path, err := e.download(e.config.OS(), a, *version, "")
 	downloadedFiles = append(downloadedFiles, path)
@@ -61,6 +72,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
+	e.log.Infof("[Agent FS Downloader] Downloaded artifact to %s", path)
 	return path, err
 }
 
@@ -100,6 +112,12 @@ func (e *Downloader) download(
 }
 
 func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
+	e.log.Infof("[Agent FS Downloader] Checking if artifact exists at %s", fullPath)
+	if _, err := os.Stat(fullPath); err == nil {
+		e.log.Infof("[Agent FS Downloader] Artifact already exists at %s, skipping download", fullPath)
+		return fullPath, nil
+	}
+
 	sourcePath := filepath.Join(e.dropPath, filename)
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
@@ -124,6 +142,7 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 		return "", err
 	}
 
+	e.log.Infof("[Agent FS Downloader] Completed download to %s", fullPath)
 	return fullPath, nil
 }
 

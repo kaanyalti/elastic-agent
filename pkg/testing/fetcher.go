@@ -99,9 +99,10 @@ func (c *fetcherCache) fetch(ctx context.Context, l Logger, res FetcherResult) (
 	src := filepath.Join(c.dir, name)
 	_, err := os.Stat(src)
 	if err == nil || os.IsExist(err) {
-		l.Logf("Using existing artifact %s", name)
+		l.Logf("[Fetcher] Using cached artifact: %s", src)
 		return src, nil
 	}
+	l.Logf("[Fetcher] Downloading artifact: %s", src)
 	err = res.Fetch(ctx, l, c.dir)
 	if err != nil {
 		return "", err
