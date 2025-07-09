@@ -16,17 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
-// generateTestVersions generates a slice of ParsedSemVer pointers from startVersion to endVersion (inclusive).
-// For each minor version in the range, and for each patch version 0-9, it generates:
-//   - base version (e.g., 8.17.0)
-//   - base-SNAPSHOT
-//   - base+metadata
-//   - base-SNAPSHOT+metadata
-//
-// For intermediate major versions (not start or end), minor versions are limited by minMinor-maxMinor.
-// For intermediate minor versions (not start or end), patch versions are limited by minPatch-maxPatch.
-// Returns versions sorted from newest to oldest.
-func generateTestVersions(startVersion, endVersion string, minMinor, maxMinor, minPatch, maxPatch int) ([]*version.ParsedSemVer, error) {
+func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSemVer, error) {
 	var versionStrings []string
 	start, err := version.ParseVersion(startVersion)
 	if err != nil {
@@ -38,9 +28,9 @@ func generateTestVersions(startVersion, endVersion string, minMinor, maxMinor, m
 	}
 
 	for major := start.Major(); major <= end.Major(); major++ {
-		// Determine minor range based on major boundaries
-		minorStart := minMinor
-		minorEnd := maxMinor
+		// Arbitrarily chosen well defined range of minor versions
+		minorStart := 0
+		minorEnd := 19
 
 		if major == start.Major() {
 			minorStart = start.Minor()
@@ -51,9 +41,9 @@ func generateTestVersions(startVersion, endVersion string, minMinor, maxMinor, m
 		}
 
 		for minor := minorStart; minor <= minorEnd; minor++ {
-			// Determine patch range based on major and minor boundaries
-			patchStart := minPatch
-			patchEnd := maxPatch
+			// Arbitrarily chosen well defined range of patch versions
+			patchStart := 0
+			patchEnd := 9
 			if major == start.Major() && minor == start.Minor() {
 				patchStart = start.Patch()
 			}
@@ -105,22 +95,22 @@ func TestGenerateTestVersions(t *testing.T) {
 		"8.17.2 to 9.2.0": {
 			startVersion:          "8.17.2",
 			endVersion:            "9.2.0",
-			expectedNewestVersion: "9.2.0",                    // First version should be newest (from end range)
-			expectedOldestVersion: "8.17.2-SNAPSHOT+metadata", // Last version should be oldest (from start range)
+			expectedNewestVersion: "9.2.0",
+			expectedOldestVersion: "8.17.2-SNAPSHOT+metadata",
 			error:                 "",
 		},
 		"9.0.0 to 9.20.0": {
 			startVersion:          "9.0.0",
 			endVersion:            "9.20.0",
-			expectedNewestVersion: "9.20.0",                  // First version should be newest (from end range)
-			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata", // Last version should be oldest (from start range)
+			expectedNewestVersion: "9.20.0",
+			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata",
 			error:                 "",
 		},
 		"9.0.0 to 9.0.0": {
 			startVersion:          "9.0.0",
 			endVersion:            "9.0.0",
-			expectedNewestVersion: "9.0.0",                   // Same start and end, so first is base version
-			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata", // Last is snapshot+metadata version
+			expectedNewestVersion: "9.0.0",
+			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata",
 			error:                 "",
 		},
 		"invalid start version": {
@@ -141,7 +131,7 @@ func TestGenerateTestVersions(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			versions, err := generateTestVersions(tc.startVersion, tc.endVersion, 0, 19, 0, 9)
+			versions, err := generateTestVersions(tc.startVersion, tc.endVersion)
 
 			if tc.error != "" {
 				require.Error(t, err)
