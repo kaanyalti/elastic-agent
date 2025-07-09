@@ -23,9 +23,10 @@ import (
 //   - base+metadata
 //   - base-SNAPSHOT+metadata
 //
-// For intermediate major versions (not start or end), minor versions are limited to 0-19.
+// For intermediate major versions (not start or end), minor versions are limited by minMinor-maxMinor.
+// For intermediate minor versions (not start or end), patch versions are limited by minPatch-maxPatch.
 // Returns versions sorted from newest to oldest.
-func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSemVer, error) {
+func generateTestVersions(startVersion, endVersion string, minMinor, maxMinor, minPatch, maxPatch int) ([]*version.ParsedSemVer, error) {
 	var versionStrings []string
 	start, err := version.ParseVersion(startVersion)
 	if err != nil {
@@ -38,35 +39,30 @@ func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSem
 
 	for major := start.Major(); major <= end.Major(); major++ {
 		// Determine minor range based on major boundaries
-		var minMinor, maxMinor int
+		minorStart := minMinor
+		minorEnd := maxMinor
+
 		if major == start.Major() {
-			minMinor = start.Minor()
-		} else {
-			minMinor = 0
+			minorStart = start.Minor()
 		}
 
 		if major == end.Major() {
-			maxMinor = end.Minor()
-		} else {
-			maxMinor = 19
+			minorEnd = end.Minor()
 		}
 
-		for minor := minMinor; minor <= maxMinor; minor++ {
+		for minor := minorStart; minor <= minorEnd; minor++ {
 			// Determine patch range based on major and minor boundaries
-			var minPatch, maxPatch int
+			patchStart := minPatch
+			patchEnd := maxPatch
 			if major == start.Major() && minor == start.Minor() {
-				minPatch = start.Patch()
-			} else {
-				minPatch = 0
+				patchStart = start.Patch()
 			}
 
 			if major == end.Major() && minor == end.Minor() {
-				maxPatch = end.Patch()
-			} else {
-				maxPatch = 9
+				patchEnd = end.Patch()
 			}
 
-			for patch := minPatch; patch <= maxPatch; patch++ {
+			for patch := patchStart; patch <= patchEnd; patch++ {
 				base := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 				versionStrings = append(versionStrings, base)
 				versionStrings = append(versionStrings, base+"-SNAPSHOT")
@@ -145,7 +141,7 @@ func TestGenerateTestVersions(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			versions, err := generateTestVersions(tc.startVersion, tc.endVersion)
+			versions, err := generateTestVersions(tc.startVersion, tc.endVersion, 0, 19, 0, 9)
 
 			if tc.error != "" {
 				require.Error(t, err)
