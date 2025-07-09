@@ -816,6 +816,61 @@ func TestPreviousMinor(t *testing.T) {
 				},
 			},
 		},
+		"Nth major Nth patch": {
+			currentVersion: "9.2.15",
+			upgradeableSets: map[string]upgradeableSet{
+				"previous minor from the same major and previous major versions": {
+					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.15"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "9.1.9",
+							err:      "",
+							message:  "Should return the previous minor from the same major",
+						},
+						snapshot: {
+							expected: "9.1.9",
+							err:      "",
+							message:  "Should return the previous minor from the same major",
+						},
+						metadata: {
+							expected: "9.1.9",
+							err:      "",
+							message:  "Should return the previous minor from the same major",
+						},
+						snapshotMetadata: {
+							expected: "9.1.9",
+							err:      "",
+							message:  "Should return the previous minor from the same major",
+						},
+					},
+				},
+				"only current major and higher versions": {
+					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+						snapshot: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+						metadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+						snapshotMetadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for suiteName, testCase := range testSuite {
