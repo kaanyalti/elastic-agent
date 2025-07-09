@@ -416,7 +416,6 @@ func TestPreviousMinor(t *testing.T) {
 	type releaseTypes struct {
 		expected string
 		err      string
-		message  string
 	}
 
 	type upgradeableSet struct {
@@ -439,22 +438,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the first release version less than current",
 						},
 						snapshot: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the first snapshot version less than current",
 						},
 						metadata: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the first metadata version less than current",
 						},
 						snapshotMetadata: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the first snapshotMetadata version less than current",
 						},
 					},
 				},
@@ -464,22 +459,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -489,22 +480,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.0.0-SNAPSHOT",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "9.0.0-SNAPSHOT",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -514,22 +501,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.0.0-SNAPSHOT",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "9.0.0-SNAPSHOT",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -539,22 +522,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.0.0-SNAPSHOT",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshot: {
 							expected: "8.19.9",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						metadata: {
 							expected: "9.0.0-SNAPSHOT",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshotMetadata: {
 							expected: "8.19.9",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 					},
 				},
@@ -569,22 +548,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshot: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						metadata: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshotMetadata: {
 							expected: "8.19.0",
 							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 					},
 				},
@@ -594,22 +569,60 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
+						},
+					},
+				},
+				"only current major versions": {
+					upgradeableVersions: mustGenerateTestVersions("9.0.1", "9.0.1"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "9.0.1-SNAPSHOT",
+							err:      "",
+						},
+						snapshot: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+						},
+						metadata: {
+							expected: "9.0.1-SNAPSHOT",
+							err:      "",
+						},
+						snapshotMetadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+						},
+					},
+				},
+				"current major and higher versions with older major versions": {
+					upgradeableVersions: mustGenerateTestVersions("8.17.2", "9.0.1"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "9.0.1-SNAPSHOT",
+							err:      "",
+						},
+						snapshot: {
+							expected: "9.0.0",
+							err:      "",
+						},
+						metadata: {
+							expected: "9.0.1-SNAPSHOT",
+							err:      "",
+						},
+						snapshotMetadata: {
+							expected: "9.0.0",
+							err:      "",
 						},
 					},
 				},
@@ -624,22 +637,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshot: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						metadata: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshotMetadata: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 					},
 				},
@@ -649,22 +658,39 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
+						},
+					},
+				},
+				"only previous major versions": {
+					upgradeableVersions: mustGenerateTestVersions("8.17.0", "8.19.0"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+						},
+						snapshot: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+						},
+						metadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+						},
+						snapshotMetadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
 						},
 					},
 				},
@@ -679,22 +705,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshot: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						metadata: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshotMetadata: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 					},
 				},
@@ -704,22 +726,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -734,22 +752,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshot: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						metadata: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshotMetadata: {
 							expected: "9.0.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 					},
 				},
@@ -759,22 +773,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -789,22 +799,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshot: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						metadata: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshotMetadata: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 					},
 				},
@@ -814,22 +820,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -844,22 +846,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshot: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						metadata: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshotMetadata: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 					},
 				},
@@ -869,22 +867,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -899,22 +893,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshot: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						metadata: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 						snapshotMetadata: {
 							expected: "9.1.9",
 							err:      "",
-							message:  "Should return the previous minor from the same major",
 						},
 					},
 				},
@@ -924,22 +914,18 @@ func TestPreviousMinor(t *testing.T) {
 						release: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshot: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						metadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 						snapshotMetadata: {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
 						},
 					},
 				},
@@ -958,19 +944,19 @@ func TestPreviousMinor(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					result, err := previousMinor(testVersion, set.upgradeableVersions)
 					if vcase.err != "" {
-						require.Error(t, err, vcase.message, func() string {
+						require.Error(t, err, func() string {
 							if result != nil {
 								return fmt.Sprintf("expected: %s, got: %s", vcase.expected, result.Original())
 							}
 							return fmt.Sprintf("expected: %s, got: <nil>", vcase.expected)
 						}())
-						require.Equal(t, vcase.err, err.Error(), vcase.message)
+						require.Equal(t, vcase.err, err.Error())
 						return
 					}
-					require.NoError(t, err, vcase.message)
+					require.NoError(t, err)
 					expected, err := version.ParseVersion(vcase.expected)
-					require.NoError(t, err, vcase.message)
-					require.Equal(t, expected, result, vcase.message)
+					require.NoError(t, err)
+					require.Equal(t, expected, result)
 				})
 			}
 		}
