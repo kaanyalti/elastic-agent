@@ -37,23 +37,35 @@ func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSem
 	}
 
 	for major := start.Major(); major <= end.Major(); major++ {
-		minMinor := 0
-		maxMinor := 19
+		// Determine minor range based on major boundaries
+		var minMinor, maxMinor int
 		if major == start.Major() {
 			minMinor = start.Minor()
+		} else {
+			minMinor = 0
 		}
+
 		if major == end.Major() {
 			maxMinor = end.Minor()
+		} else {
+			maxMinor = 19
 		}
+
 		for minor := minMinor; minor <= maxMinor; minor++ {
-			minPatch := 0
-			maxPatch := 9
+			// Determine patch range based on major and minor boundaries
+			var minPatch, maxPatch int
 			if major == start.Major() && minor == start.Minor() {
 				minPatch = start.Patch()
+			} else {
+				minPatch = 0
 			}
+
 			if major == end.Major() && minor == end.Minor() {
 				maxPatch = end.Patch()
+			} else {
+				maxPatch = 9
 			}
+
 			for patch := minPatch; patch <= maxPatch; patch++ {
 				base := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 				versionStrings = append(versionStrings, base)
@@ -88,46 +100,46 @@ func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSem
 
 func TestGenerateTestVersions(t *testing.T) {
 	testCases := map[string]struct {
-		startVersion         string
-		endVersion           string
-		expectedStartVersion string
-		expectedEndVersion   string
-		error                string
+		startVersion          string
+		endVersion            string
+		expectedNewestVersion string
+		expectedOldestVersion string
+		error                 string
 	}{
 		"8.17.2 to 9.2.0": {
-			startVersion:         "8.17.2",
-			endVersion:           "9.2.0",
-			expectedStartVersion: "8.17.2",
-			expectedEndVersion:   "9.2.0-SNAPSHOT+metadata",
-			error:                "",
+			startVersion:          "8.17.2",
+			endVersion:            "9.2.0",
+			expectedNewestVersion: "9.2.0",                    // First version should be newest (from end range)
+			expectedOldestVersion: "8.17.2-SNAPSHOT+metadata", // Last version should be oldest (from start range)
+			error:                 "",
 		},
 		"9.0.0 to 9.20.0": {
-			startVersion:         "9.0.0",
-			endVersion:           "9.20.0",
-			expectedStartVersion: "9.0.0",
-			expectedEndVersion:   "9.20.0-SNAPSHOT+metadata",
-			error:                "",
+			startVersion:          "9.0.0",
+			endVersion:            "9.20.0",
+			expectedNewestVersion: "9.20.0",                  // First version should be newest (from end range)
+			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata", // Last version should be oldest (from start range)
+			error:                 "",
 		},
 		"9.0.0 to 9.0.0": {
-			startVersion:         "9.0.0",
-			endVersion:           "9.0.0",
-			expectedStartVersion: "9.0.0",
-			expectedEndVersion:   "9.0.0-SNAPSHOT+metadata",
-			error:                "",
+			startVersion:          "9.0.0",
+			endVersion:            "9.0.0",
+			expectedNewestVersion: "9.0.0",                   // Same start and end, so first is base version
+			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata", // Last is snapshot+metadata version
+			error:                 "",
 		},
 		"invalid start version": {
-			startVersion:         "invalid.version",
-			endVersion:           "",
-			expectedStartVersion: "",
-			expectedEndVersion:   "",
-			error:                "invalid startVersion:",
+			startVersion:          "invalid.version",
+			endVersion:            "",
+			expectedNewestVersion: "",
+			expectedOldestVersion: "",
+			error:                 "invalid startVersion:",
 		},
 		"invalid end version": {
-			startVersion:         "9.0.0",
-			endVersion:           "invalid.version",
-			expectedStartVersion: "",
-			expectedEndVersion:   "",
-			error:                "invalid endVersion:",
+			startVersion:          "9.0.0",
+			endVersion:            "invalid.version",
+			expectedNewestVersion: "",
+			expectedOldestVersion: "",
+			error:                 "invalid endVersion:",
 		},
 	}
 
@@ -151,20 +163,20 @@ func TestGenerateTestVersions(t *testing.T) {
 					versions[i-1].Original(), versions[i].Original())
 			}
 
-			expectedStartParsed, err := version.ParseVersion(tc.expectedStartVersion)
+			expectedNewestParsed, err := version.ParseVersion(tc.expectedNewestVersion)
 			require.NoError(t, err)
-			expectedEndParsed, err := version.ParseVersion(tc.expectedEndVersion)
+			expectedOldestParsed, err := version.ParseVersion(tc.expectedOldestVersion)
 			require.NoError(t, err)
 
 			firstVersion := versions[0]
-			require.True(t, firstVersion.Equal(*expectedStartParsed),
-				"first version %s should be equal to expected start version %s",
-				firstVersion.Original(), tc.expectedStartVersion)
+			require.True(t, firstVersion.Equal(*expectedNewestParsed),
+				"first version %s should be equal to expected newest version %s",
+				firstVersion.Original(), tc.expectedNewestVersion)
 
 			lastVersion := versions[len(versions)-1]
-			require.True(t, lastVersion.Equal(*expectedEndParsed),
-				"last version %s should be equal to expected end version %s",
-				lastVersion.Original(), tc.expectedEndVersion)
+			require.True(t, lastVersion.Equal(*expectedOldestParsed),
+				"last version %s should be equal to expected oldest version %s",
+				lastVersion.Original(), tc.expectedOldestVersion)
 		})
 	}
 }
