@@ -508,6 +508,56 @@ func TestPreviousMinor(t *testing.T) {
 						},
 					},
 				},
+				"current major and higher versions": {
+					upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.2.0"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "9.0.0-SNAPSHOT",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+						snapshot: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+						metadata: {
+							expected: "9.0.0-SNAPSHOT",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+						snapshotMetadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+					},
+				},
+				"current major and higher versions with older major versions": {
+					upgradeableVersions: mustGenerateTestVersions("8.17.2", "9.0.0"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "9.0.0-SNAPSHOT",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+						snapshot: {
+							expected: "8.19.9",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+						metadata: {
+							expected: "9.0.0-SNAPSHOT",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+						snapshotMetadata: {
+							expected: "8.19.9",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+					},
+				},
 			},
 		},
 		"First patch release of a new version": {
