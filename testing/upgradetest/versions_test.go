@@ -71,13 +71,12 @@ func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSem
 		versions = append(versions, parsed)
 	}
 
-	// Sort from newest to oldest with stable sort for equal precedence versions
+	// Sort from newest to oldest
+	// Release and metadata versions are equal, sort lexicographicall
 	sort.SliceStable(versions, func(i, j int) bool {
-		// Primary comparison: version precedence (newest to oldest)
 		if !versions[i].Equal(*versions[j]) {
 			return versions[j].Less(*versions[i])
 		}
-		// Secondary comparison for equal precedence: lexicographic by original string for consistency
 		return versions[i].Original() < versions[j].Original()
 	})
 
@@ -459,7 +458,7 @@ func TestPreviousMinor(t *testing.T) {
 						},
 					},
 				},
-				"only current and higher major versions": {
+				"only higher major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
 					releaseTypes: map[string]releaseTypes{
 						release: {
@@ -476,6 +475,31 @@ func TestPreviousMinor(t *testing.T) {
 							expected: "",
 							err:      ErrNoPreviousMinor.Error(),
 							message:  "Should return error when no previous minor version is found",
+						},
+						snapshotMetadata: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+					},
+				},
+				"only current major versions": {
+					upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.0.9"),
+					releaseTypes: map[string]releaseTypes{
+						release: {
+							expected: "9.0.0-SNAPSHOT",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
+						},
+						snapshot: {
+							expected: "",
+							err:      ErrNoPreviousMinor.Error(),
+							message:  "Should return error when no previous minor version is found",
+						},
+						metadata: {
+							expected: "9.0.0-SNAPSHOT",
+							err:      "",
+							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
 						},
 						snapshotMetadata: {
 							expected: "",
@@ -514,7 +538,7 @@ func TestPreviousMinor(t *testing.T) {
 						},
 					},
 				},
-				"only current and higher major versions": {
+				"only higher major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
 					releaseTypes: map[string]releaseTypes{
 						release: {
@@ -569,7 +593,7 @@ func TestPreviousMinor(t *testing.T) {
 						},
 					},
 				},
-				"only current major versions": {
+				"only current major or higher versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
 					releaseTypes: map[string]releaseTypes{
 						release: {
