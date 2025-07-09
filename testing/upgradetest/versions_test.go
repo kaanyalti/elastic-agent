@@ -428,51 +428,26 @@ func TestPreviousMinor(t *testing.T) {
 		upgradeableSets map[string]upgradeableSet
 	}
 
+	allSameResult := func(expected, err string) map[string]releaseTypes {
+		return map[string]releaseTypes{
+			release:          {expected: expected, err: err},
+			snapshot:         {expected: expected, err: err},
+			metadata:         {expected: expected, err: err},
+			snapshotMetadata: {expected: expected, err: err},
+		}
+	}
+
 	testSuite := map[string]testCase{
 		"First major version": {
 			currentVersion: "9.0.0",
 			upgradeableSets: map[string]upgradeableSet{
 				"only previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.2", "8.19.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "8.19.0",
-							err:      "",
-						},
-						snapshot: {
-							expected: "8.19.0",
-							err:      "",
-						},
-						metadata: {
-							expected: "8.19.0",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "8.19.0",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("8.19.0", ""),
 				},
 				"only higher major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 				"only current major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.0.9"),
@@ -544,45 +519,11 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"only previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.2", "8.19.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "8.19.0",
-							err:      "",
-						},
-						snapshot: {
-							expected: "8.19.0",
-							err:      "",
-						},
-						metadata: {
-							expected: "8.19.0",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "8.19.0",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("8.19.0", ""),
 				},
 				"only higher major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 				"only current major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.0.1", "9.0.1"),
@@ -633,66 +574,15 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"previous minor from the same major and previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.0.9",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("9.0.9", ""),
 				},
 				"only current major or higher versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 				"only previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "8.19.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 			},
 		},
@@ -701,45 +591,11 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"previous minor from the same major and previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.1"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.0.9",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("9.0.9", ""),
 				},
 				"only current major versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 			},
 		},
@@ -748,45 +604,11 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"previous minor from the same major and previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.15"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.0.9",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.0.9",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("9.0.9", ""),
 				},
 				"only current major and higher versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 			},
 		},
@@ -795,45 +617,11 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"previous minor from the same major and previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.1.9",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("9.1.9", ""),
 				},
 				"only current major and higher versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 			},
 		},
@@ -842,45 +630,11 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"previous minor from the same major and previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.1"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.1.9",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("9.1.9", ""),
 				},
 				"only current major and higher versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 			},
 		},
@@ -889,45 +643,11 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableSets: map[string]upgradeableSet{
 				"previous minor from the same major and previous major versions": {
 					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.15"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.1.9",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.1.9",
-							err:      "",
-						},
-					},
+					releaseTypes:        allSameResult("9.1.9", ""),
 				},
 				"only current major and higher versions": {
 					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
 				},
 			},
 		},
