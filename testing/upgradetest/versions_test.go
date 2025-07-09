@@ -407,26 +407,26 @@ func TestPreviousMinor(t *testing.T) {
 		snapshotMetadata = snapshot + metadata
 	)
 
-	mustGenerateTestVersions := func(startVersion, endVersion string) []*version.ParsedSemVer {
-		versions, err := generateTestVersions(startVersion, endVersion)
-		require.NoError(t, err)
-		return versions
-	}
+	// mustGenerateTestVersions := func(startVersion, endVersion string) []*version.ParsedSemVer {
+	// 	versions, err := generateTestVersions(startVersion, endVersion)
+	// 	require.NoError(t, err)
+	// 	return versions
+	// }
 
 	type releaseTypes struct {
 		expected string
 		err      string
 	}
 
-	type upgradeableSet struct {
-		upgradeableVersions []*version.ParsedSemVer
-		releaseTypes        map[string]releaseTypes
-	}
+	// type upgradeableSet struct {
+	// 	upgradeableVersions []*version.ParsedSemVer
+	// 	releaseTypes        map[string]releaseTypes
+	// }
 
-	type testCase struct {
-		currentVersion  string
-		upgradeableSets map[string]upgradeableSet
-	}
+	// type testCase struct {
+	// 	currentVersion  string
+	// 	upgradeableSets map[string]upgradeableSet
+	// }
 
 	allSameResult := func(expected, err string) map[string]releaseTypes {
 		return map[string]releaseTypes{
@@ -437,250 +437,532 @@ func TestPreviousMinor(t *testing.T) {
 		}
 	}
 
-	testSuite := map[string]testCase{
-		"First major version": {
-			currentVersion: "9.0.0",
-			upgradeableSets: map[string]upgradeableSet{
-				"only previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.2", "8.19.0"),
-					releaseTypes:        allSameResult("8.19.0", ""),
+	type scenario struct {
+		currentVersion    string
+		oldestCoreVersion string
+		newestCoreVersion string
+		expected          map[string]releaseTypes
+	}
+	type testScenarios map[string]scenario
+
+	scenarios := testScenarios{
+		"First major version - only previous major versions": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("8.19.0", ""),
+		},
+		"First major version - only newer major versions": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "9.1.0",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"First major version - only current major version": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "9.0.0",
+			newestCoreVersion: "9.0.0",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
 				},
-				"only higher major versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+				snapshot: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
 				},
-				"only current major versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.0.9"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.0-SNAPSHOT",
-							err:      "",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "9.0.0-SNAPSHOT",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+				metadata: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
 				},
-				"current major and higher versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.2.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.0-SNAPSHOT",
-							err:      "",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "9.0.0-SNAPSHOT",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
-				},
-				"current major and higher versions with older major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.2", "9.0.0"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.0-SNAPSHOT",
-							err:      "",
-						},
-						snapshot: {
-							expected: "8.19.9",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.0.0-SNAPSHOT",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "8.19.9",
-							err:      "",
-						},
-					},
+				snapshotMetadata: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
 				},
 			},
 		},
-		"First patch release of a new version": {
-			currentVersion: "9.0.1",
-			upgradeableSets: map[string]upgradeableSet{
-				"only previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.2", "8.19.0"),
-					releaseTypes:        allSameResult("8.19.0", ""),
+		"First major version - current major, newer versions and older versions": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.0",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
 				},
-				"only higher major versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+				snapshot: {
+					expected: "8.19.9",
+					err:      "",
 				},
-				"only current major versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.0.1", "9.0.1"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.1-SNAPSHOT",
-							err:      "",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-						metadata: {
-							expected: "9.0.1-SNAPSHOT",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-						},
-					},
+				metadata: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
 				},
-				"current major and higher versions with older major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.2", "9.0.1"),
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.1-SNAPSHOT",
-							err:      "",
-						},
-						snapshot: {
-							expected: "9.0.0",
-							err:      "",
-						},
-						metadata: {
-							expected: "9.0.1-SNAPSHOT",
-							err:      "",
-						},
-						snapshotMetadata: {
-							expected: "9.0.0",
-							err:      "",
-						},
-					},
+				snapshotMetadata: {
+					expected: "8.19.9",
+					err:      "",
 				},
 			},
 		},
-		"First minor release": {
-			currentVersion: "9.1.0",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.0"),
-					releaseTypes:        allSameResult("9.0.9", ""),
+		"First patch release of a new version - only previous major versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("8.19.0", ""),
+		},
+		"First patch release of a new version - only newer major versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "9.1.0",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"First patch release of a new version - only current major versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "9.0.1",
+			newestCoreVersion: "9.0.1",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
 				},
-				"only current major or higher versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+				snapshot: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
 				},
-				"only previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "8.19.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+				metadata: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
 				},
 			},
 		},
-		"First patch of first minor": {
-			currentVersion: "9.1.1",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.1"),
-					releaseTypes:        allSameResult("9.0.9", ""),
+		"First patch release of a new version - current major, newer versions and older versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.0",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
 				},
-				"only current major versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+				snapshot: {
+					expected: "9.0.0",
+					err:      "",
 				},
-			},
-		},
-		"Nth patch of first minor": {
-			currentVersion: "9.1.15",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.15"),
-					releaseTypes:        allSameResult("9.0.9", ""),
+				metadata: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
 				},
-				"only current major and higher versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+				snapshotMetadata: {
+					expected: "9.0.0",
+					err:      "",
 				},
 			},
 		},
-		"Nth major": {
-			currentVersion: "9.2.0",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.0"),
-					releaseTypes:        allSameResult("9.1.9", ""),
-				},
-				"only current major and higher versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
-				},
-			},
+		"First minor release - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.1.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.1.0",
+			expected:          allSameResult("9.0.9", ""),
 		},
-		"Nth major first patch": {
-			currentVersion: "9.2.1",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.1"),
-					releaseTypes:        allSameResult("9.1.9", ""),
-				},
-				"only current major and higher versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
-				},
-			},
+		"First minor release - only current major or higher versions": {
+			currentVersion:    "9.1.0",
+			oldestCoreVersion: "9.1.0",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
 		},
-		"Nth major Nth patch": {
-			currentVersion: "9.2.15",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.15"),
-					releaseTypes:        allSameResult("9.1.9", ""),
-				},
-				"only current major and higher versions": {
-					upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
-					releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
-				},
-			},
+		"First minor release - only previous major versions": {
+			currentVersion:    "9.1.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"First patch of first minor - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.1.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.1.1",
+			expected:          allSameResult("9.0.9", ""),
+		},
+		"First patch of first minor - only current major or higher versions": {
+			currentVersion:    "9.1.1",
+			oldestCoreVersion: "9.1.1",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"First patch of first minor - only previous major versions": {
+			currentVersion:    "9.1.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth patch of first minor - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.1.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.1.15",
+			expected:          allSameResult("9.0.9", ""),
+		},
+		"Nth patch of first minor - only current major or higher versions": {
+			currentVersion:    "9.1.15",
+			oldestCoreVersion: "9.1.15",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth patch of first minor - only previous major versions": {
+			currentVersion:    "9.1.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth major - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.2.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("9.1.9", ""),
+		},
+		"Nth major - only current major or higher versions": {
+			currentVersion:    "9.2.0",
+			oldestCoreVersion: "9.2.0",
+			newestCoreVersion: "9.3.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth major - only previous major versions": {
+			currentVersion:    "9.2.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth major first patch - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.2.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.1",
+			expected:          allSameResult("9.1.9", ""),
+		},
+		"Nth major first patch - only current major or higher versions": {
+			currentVersion:    "9.2.1",
+			oldestCoreVersion: "9.2.0",
+			newestCoreVersion: "9.3.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth major first patch - only previous major versions": {
+			currentVersion:    "9.2.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth major Nth patch - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.15",
+			expected:          allSameResult("9.1.9", ""),
+		},
+		"Nth major Nth patch - only current major or higher versions": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "9.2.15",
+			newestCoreVersion: "9.3.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Nth major Nth patch - only previous major versions": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Empty version range": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "",
+			newestCoreVersion: "",
+			expected:          allSameResult("", ErrNoPreviousMinor.Error()),
+		},
+		"Unparsable current version": {
+			currentVersion:    "invalid version",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", "failed to parse the current version"),
 		},
 	}
 
-	for suiteName, testCase := range testSuite {
-		for setName, set := range testCase.upgradeableSets {
-			for versionType, vcase := range set.releaseTypes {
-				testVersion := testCase.currentVersion
-				if versionType != "" {
-					testVersion = testCase.currentVersion + versionType
-				}
-				testName := suiteName + " " + setName + " " + testVersion
-				t.Run(testName, func(t *testing.T) {
-					result, err := previousMinor(testVersion, set.upgradeableVersions)
-					if vcase.err != "" {
-						require.Error(t, err, func() string {
-							if result != nil {
-								return fmt.Sprintf("expected: %s, got: %s", vcase.expected, result.Original())
-							}
-							return fmt.Sprintf("expected: %s, got: <nil>", vcase.expected)
-						}())
-						require.Equal(t, vcase.err, err.Error())
-						return
-					}
-					require.NoError(t, err)
-					expected, err := version.ParseVersion(vcase.expected)
-					require.NoError(t, err)
-					require.Equal(t, expected, result)
-				})
+	for name, scenario := range scenarios {
+		versions := version.SortableParsedVersions{}
+		var err error
+		if scenario.oldestCoreVersion != "" && scenario.newestCoreVersion != "" {
+			versions, err = generateTestVersions(scenario.oldestCoreVersion, scenario.newestCoreVersion)
+			require.NoError(t, err)
+		}
+
+		for versionType, vcase := range scenario.expected {
+			testVersion := scenario.currentVersion
+			if versionType != "" {
+				testVersion = scenario.currentVersion + versionType
 			}
+			t.Run(name+" "+versionType, func(t *testing.T) {
+				result, err := previousMinor(testVersion, versions)
+				if vcase.err != "" {
+					require.Error(t, err, func() string {
+						if result != nil {
+							return fmt.Sprintf("expected: %s, got: %s", vcase.expected, result.Original())
+						}
+						return fmt.Sprintf("expected: %s, got: <nil>", vcase.expected)
+					}())
+
+					require.Contains(t, err.Error(), vcase.err)
+					return
+				}
+
+				require.NoError(t, err)
+				expected, err := version.ParseVersion(vcase.expected)
+				require.NoError(t, err)
+				require.Equal(t, expected, result)
+			})
 		}
 	}
+
+	// testSuite := map[string]testCase{
+	// 	"First major version": {
+	// 		currentVersion: "9.0.0",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"only previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.2", "8.19.0"),
+	// 				releaseTypes:        allSameResult("8.19.0", ""),
+	// 			},
+	// 			"only higher major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 			"only current major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.0.9"),
+	// 				releaseTypes: map[string]releaseTypes{
+	// 					release: {
+	// 						expected: "9.0.0-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshot: {
+	// 						expected: "",
+	// 						err:      ErrNoPreviousMinor.Error(),
+	// 					},
+	// 					metadata: {
+	// 						expected: "9.0.0-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshotMetadata: {
+	// 						expected: "",
+	// 						err:      ErrNoPreviousMinor.Error(),
+	// 					},
+	// 				},
+	// 			},
+	// 			"current major and higher versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.0.0", "9.2.0"),
+	// 				releaseTypes: map[string]releaseTypes{
+	// 					release: {
+	// 						expected: "9.0.0-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshot: {
+	// 						expected: "",
+	// 						err:      ErrNoPreviousMinor.Error(),
+	// 					},
+	// 					metadata: {
+	// 						expected: "9.0.0-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshotMetadata: {
+	// 						expected: "",
+	// 						err:      ErrNoPreviousMinor.Error(),
+	// 					},
+	// 				},
+	// 			},
+	// 			"current major, newer versions and older major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.2", "9.0.0"),
+	// releaseTypes: map[string]releaseTypes{
+	// 	release: {
+	// 		expected: "9.0.0-SNAPSHOT",
+	// 		err:      "",
+	// 	},
+	// 	snapshot: {
+	// 		expected: "8.19.9",
+	// 		err:      "",
+	// 	},
+	// 	metadata: {
+	// 		expected: "9.0.0-SNAPSHOT",
+	// 		err:      "",
+	// 	},
+	// 	snapshotMetadata: {
+	// 		expected: "8.19.9",
+	// 		err:      "",
+	// 	},
+	// },
+	// 			},
+	// 		},
+	// 	},
+	// 	"First patch release of a new version": {
+	// 		currentVersion: "9.0.1",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"only previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.2", "8.19.0"),
+	// 				releaseTypes:        allSameResult("8.19.0", ""),
+	// 			},
+	// 			"only higher major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 			"only current major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.0.1", "9.0.1"),
+	// 				releaseTypes: map[string]releaseTypes{
+	// 					release: {
+	// 						expected: "9.0.1-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshot: {
+	// 						expected: "",
+	// 						err:      ErrNoPreviousMinor.Error(),
+	// 					},
+	// 					metadata: {
+	// 						expected: "9.0.1-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshotMetadata: {
+	// 						expected: "",
+	// 						err:      ErrNoPreviousMinor.Error(),
+	// 					},
+	// 				},
+	// 			},
+	// 			"current major and higher versions with older major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.2", "9.0.1"),
+	// 				releaseTypes: map[string]releaseTypes{
+	// 					release: {
+	// 						expected: "9.0.1-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshot: {
+	// 						expected: "9.0.0",
+	// 						err:      "",
+	// 					},
+	// 					metadata: {
+	// 						expected: "9.0.1-SNAPSHOT",
+	// 						err:      "",
+	// 					},
+	// 					snapshotMetadata: {
+	// 						expected: "9.0.0",
+	// 						err:      "",
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// 	"First minor release": {
+	// 		currentVersion: "9.1.0",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"previous minor from the same major and previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.0"),
+	// 				releaseTypes:        allSameResult("9.0.9", ""),
+	// 			},
+	// 			"only current major or higher versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 			"only previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "8.19.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 		},
+	// 	},
+	// 	"First patch of first minor": {
+	// 		currentVersion: "9.1.1",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"previous minor from the same major and previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.1"),
+	// 				releaseTypes:        allSameResult("9.0.9", ""),
+	// 			},
+	// 			"only current major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 		},
+	// 	},
+	// 	"Nth patch of first minor": {
+	// 		currentVersion: "9.1.15",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"previous minor from the same major and previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.1.15"),
+	// 				releaseTypes:        allSameResult("9.0.9", ""),
+	// 			},
+	// 			"only current major and higher versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.1.0", "9.2.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 		},
+	// 	},
+	// 	"Nth major": {
+	// 		currentVersion: "9.2.0",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"previous minor from the same major and previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.0"),
+	// 				releaseTypes:        allSameResult("9.1.9", ""),
+	// 			},
+	// 			"only current major and higher versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 		},
+	// 	},
+	// 	"Nth major first patch": {
+	// 		currentVersion: "9.2.1",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"previous minor from the same major and previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.1"),
+	// 				releaseTypes:        allSameResult("9.1.9", ""),
+	// 			},
+	// 			"only current major and higher versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 		},
+	// 	},
+	// 	"Nth major Nth patch": {
+	// 		currentVersion: "9.2.15",
+	// 		upgradeableSets: map[string]upgradeableSet{
+	// 			"previous minor from the same major and previous major versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("8.17.0", "9.2.15"),
+	// 				releaseTypes:        allSameResult("9.1.9", ""),
+	// 			},
+	// 			"only current major and higher versions": {
+	// 				upgradeableVersions: mustGenerateTestVersions("9.2.0", "9.3.0"),
+	// 				releaseTypes:        allSameResult("", ErrNoPreviousMinor.Error()),
+	// 			},
+	// 		},
+	// 	},
+	// }
+
+	// for suiteName, testCase := range testSuite {
+	// 	for setName, set := range testCase.upgradeableSets {
+	// 		for versionType, vcase := range set.releaseTypes {
+	// 			testVersion := testCase.currentVersion
+	// 			if versionType != "" {
+	// 				testVersion = testCase.currentVersion + versionType
+	// 			}
+	// 			testName := suiteName + " " + setName + " " + testVersion
+	// 			t.Run(testName, func(t *testing.T) {
+	// 				result, err := previousMinor(testVersion, set.upgradeableVersions)
+	// 				if vcase.err != "" {
+	// 					require.Error(t, err, func() string {
+	// 						if result != nil {
+	// 							return fmt.Sprintf("expected: %s, got: %s", vcase.expected, result.Original())
+	// 						}
+	// 						return fmt.Sprintf("expected: %s, got: <nil>", vcase.expected)
+	// 					}())
+	// 					require.Equal(t, vcase.err, err.Error())
+	// 					return
+	// 				}
+	// 				require.NoError(t, err)
+	// 				expected, err := version.ParseVersion(vcase.expected)
+	// 				require.NoError(t, err)
+	// 				require.Equal(t, expected, result)
+	// 			})
+	// 		}
+	// 	}
+	// }
 }
 
 func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {
