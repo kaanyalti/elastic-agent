@@ -27,6 +27,10 @@ func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSem
 		return nil, fmt.Errorf("invalid endVersion: %w", err)
 	}
 
+	if !start.Less(*end) && !start.Equal(*end) {
+		return nil, fmt.Errorf("start version %s is newer than end version %s", startVersion, endVersion)
+	}
+
 	for major := start.Major(); major <= end.Major(); major++ {
 		// Arbitrarily chosen well defined range of minor versions
 		minorStart := 0
@@ -125,6 +129,13 @@ func TestGenerateTestVersions(t *testing.T) {
 			expectedNewestVersion: "",
 			expectedOldestVersion: "",
 			error:                 "invalid endVersion:",
+		},
+		"start version newer than end version": {
+			startVersion:          "9.2.0",
+			endVersion:            "9.0.0",
+			expectedNewestVersion: "",
+			expectedOldestVersion: "",
+			error:                 "start version 9.2.0 is newer than end version 9.0.0",
 		},
 	}
 
