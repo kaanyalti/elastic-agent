@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -245,6 +246,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
 
+		if downloadErrors.IsDiskSpaceError(err) {
+			err = downloadErrors.ErrInsufficientDiskSpace
+		}
 		return nil, err
 	}
 
