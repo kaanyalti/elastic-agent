@@ -23,6 +23,8 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -526,5 +528,79 @@ func TestDownloadVersion(t *testing.T) {
 
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
+	}
+}
+
+func TestDownloadDiskSpaceError(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, _ := logger.New("", false)
+	timeout := 30 * time.Second
+	testCases := getTestCases()
+	server, _, _ := getElasticCoServer(t)
+	elasticClient := getElasticCoClient(server)
+
+	config := &artifact.Config{
+		SourceURI:       source,
+		TargetDirectory: targetDir,
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	funcNames := []string{"copy", "openFile", "mkdirAll"}
+	for _, testCase := range testCases {
+		funcName := ""
+		for _, funcName = range funcNames {
+			testName := fmt.Sprintf("%s-binary-%s-%s", testCase.system, testCase.arch, funcName)
+			t.Run(testName, func(t *testing.T) {
+				switch funcName {
+				case "copy":
+					tmpCopy := common.Copy
+					t.Cleanup(func() {
+						common.Copy = tmpCopy
+					})
+					common.Copy = func(dst io.Writer, src io.Reader) (int64, error) {
+						return 0, downloadErrors.ErrInsufficientDiskSpace
+					}
+				case "openFile":
+					tmpOpenFile := common.OpenFile
+					t.Cleanup(func() {
+						common.OpenFile = tmpOpenFile
+					})
+					common.OpenFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+						return nil, downloadErrors.ErrInsufficientDiskSpace
+					}
+				case "mkdirAll":
+					tmpMkdirAll := common.MkdirAll
+					t.Cleanup(func() {
+						common.MkdirAll = tmpMkdirAll
+					})
+					common.MkdirAll = func(path string, perm os.FileMode) error {
+						return downloadErrors.ErrInsufficientDiskSpace
+					}
+				}
+				config.OperatingSystem = testCase.system
+				config.Architecture = testCase.arch
+
+				upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+				testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+				artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+				fmt.Printf("%s: %s\n", funcName, upgradeDetails.State)
+
+				require.ErrorIs(t, err, downloadErrors.ErrInsufficientDiskSpace)
+				require.NoFileExists(t, artifactPath)
+
+				if funcName == "copy" {
+					require.Equal(t, details.StateFailed, upgradeDetails.State)
+				}
+
+				os.Remove(artifactPath)
+			})
+		}
 	}
 }

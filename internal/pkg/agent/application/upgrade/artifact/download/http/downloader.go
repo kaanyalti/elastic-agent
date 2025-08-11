@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -100,6 +101,9 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
+			if downloadErrors.IsDiskSpaceError(err) {
+				err = downloadErrors.ErrInsufficientDiskSpace
+			}
 			for _, path := range downloadedFiles {
 				if err := os.Remove(path); err != nil {
 					e.log.Warnf("failed to cleanup %s: %v", path, err)
@@ -187,7 +191,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return "", fmt.Errorf("%w: %w", errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
 	}
 	defer destinationFile.Close()
 
@@ -216,9 +220,12 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	dp.Report(ctx)
 	_, err = common.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
+		if downloadErrors.IsDiskSpaceError(err) {
+			err = downloadErrors.ErrInsufficientDiskSpace
+		}
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(err, "copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return fullPath, fmt.Errorf("%w: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
 	}
 	dp.ReportComplete()
 
