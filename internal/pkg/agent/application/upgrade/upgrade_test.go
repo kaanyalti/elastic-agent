@@ -1412,7 +1412,7 @@ func TestUpgradeDirectoryCopyErrors(t *testing.T) {
 			initialUnpackRes, err := tmpUpgrader.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
 			require.NoError(t, err)
 
-			checkExtractedFilesWithManifestAndVersionedHome(t, paths.Data(), filepath.Join(paths.Top(), initialUnpackRes.VersionedHome))
+			checkExtractedFilesWithManifestAndVersionedHome(t, filepath.Join(paths.Top(), initialUnpackRes.VersionedHome))
 
 			targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
 			require.NoError(t, err)
