@@ -1292,3 +1292,47 @@ func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
 }
+
+func archiveFilesWithArchiveDirName(archiveName string) func(file files) files {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
+	return func(file files) files {
+		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
+
+		return file
+	}
+}
+
+func archiveFilesWithVersionedHome(version string, meta string) func(file files) files {
+	return func(file files) files {
+		if file.content == ea_123_manifest {
+			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
+			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
+
+			file.content = newContent
+		}
+		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+
+		return file
+	}
+}
+
+func modifyArchiveFiles(archiveFiles []files, modFuncs ...func(file files) files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		for _, modFunc := range modFuncs {
+			file = modFunc(file)
+		}
+		modifiedArchiveFiles[i] = file
+	}
+
+	return modifiedArchiveFiles
+}
+
+func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
+	if runtime.GOOS == "windows" {
+		return createZipArchive(t, archiveName, archiveFiles)
+	}
+	return createTarArchive(t, archiveName, archiveFiles)
+}
