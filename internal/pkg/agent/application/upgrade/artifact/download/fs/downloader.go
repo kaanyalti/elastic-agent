@@ -7,7 +7,6 @@ package fs
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -15,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -46,6 +46,10 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
+			if downloadErrors.IsDiskSpaceError(err) {
+				err = downloadErrors.ErrInsufficientDiskSpace
+			}
+
 			for _, path := range downloadedFiles {
 				os.Remove(path)
 			}
@@ -62,6 +66,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
+
 	return path, err
 }
 
@@ -116,7 +121,7 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 
 	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return "", fmt.Errorf("%w: %w", errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
 	}
 	defer destinationFile.Close()
 
