@@ -8,9 +8,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -25,6 +29,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -37,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -1335,4 +1342,135 @@ func createArchive(t *testing.T, archiveName string, archiveFiles []files) (stri
 		return createZipArchive(t, archiveName, archiveFiles)
 	}
 	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestUpgradeDirectoryCopyErrors(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+
+	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	initialArtifactName, err := artifact.GetArtifactName(agentArtifact, *initialVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	modFuncs := []func(file files) files{
+		archiveFilesWithArchiveDirName(initialArtifactName),
+		archiveFilesWithVersionedHome(initialVersion.CoreVersion(), "abcdef"),
+	}
+
+	initialArchiveFiles := modifyArchiveFiles(archiveFilesWithMoreComponents, modFuncs...)
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, err := artifact.GetArtifactName(agentArtifact, *targetVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	targetArchiveFiles := modifyArchiveFiles(archiveFilesWithMoreComponents,
+		archiveFilesWithArchiveDirName(targetArtifactName),
+		archiveFilesWithVersionedHome(targetVersion.CoreVersion(), "ghijkl"),
+	)
+
+	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo.On("Version").Return(targetVersion.String())
+
+	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
+
+	fsFuncNames := []string{"copy", "openFile", "mkdirAll"}
+
+	testCases := map[string]struct {
+		fsFuncName        string
+		mockReturnedError error
+		expectedError     error
+	}{}
+
+	for _, fsFuncName := range fsFuncNames {
+		for _, te := range downloadErrors.OS_DiskSpaceErrors {
+			testCases[fmt.Sprintf("%s_should_return_error_if_run_directory_copy_fails_with_disk_space_error: %v", fsFuncName, te)] = struct {
+				fsFuncName        string
+				mockReturnedError error
+				expectedError     error
+			}{
+				fsFuncName:        fsFuncName,
+				mockReturnedError: te,
+				expectedError:     downloadErrors.ErrInsufficientDiskSpace,
+			}
+		}
+
+	}
+
+	tmpUpgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
+	require.NoError(t, err)
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+
+			initialArchive, err := createArchive(t, initialArtifactName, initialArchiveFiles)
+			require.NoError(t, err)
+
+			t.Logf("Created archive: %s", initialArchive)
+
+			initialUnpackRes, err := tmpUpgrader.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
+			require.NoError(t, err)
+
+			checkExtractedFilesWithManifestAndVersionedHome(t, paths.Data(), filepath.Join(paths.Top(), initialUnpackRes.VersionedHome))
+
+			targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+			require.NoError(t, err)
+
+			t.Logf("Created archive: %s", targetArchive)
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, targetArchive)
+			}))
+			t.Cleanup(server.Close)
+
+			config := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			switch tc.fsFuncName {
+			case "copy":
+				tmpCopy := common.Copy
+				t.Cleanup(func() {
+					common.Copy = tmpCopy
+				})
+
+				common.Copy = func(dst io.Writer, src io.Reader) (int64, error) {
+					return 0, tc.mockReturnedError
+				}
+			case "openFile":
+				tmpOpenFile := common.OpenFile
+				t.Cleanup(func() {
+					common.OpenFile = tmpOpenFile
+				})
+				common.OpenFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+					return nil, tc.mockReturnedError
+				}
+			case "mkdirAll":
+				tmpMkdirAll := common.MkdirAll
+				t.Cleanup(func() {
+					common.MkdirAll = tmpMkdirAll
+				})
+				common.MkdirAll = func(path string, perm os.FileMode) error {
+					return tc.mockReturnedError
+				}
+			}
+
+			upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
+			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+			require.Equal(t, err.Error(), tc.expectedError.Error())
+
+			entries, err := os.ReadDir(config.TargetDirectory)
+			require.NoError(t, err, "reading target directory failed")
+			require.Len(t, entries, 0, "the downloaded artifact should be cleaned upif download fails")
+		})
+	}
 }

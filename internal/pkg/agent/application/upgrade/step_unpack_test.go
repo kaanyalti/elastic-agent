@@ -481,8 +481,7 @@ func checkExtractedFilesOutOfOrder(t *testing.T, versionedHome string) {
 	}
 }
 
-func checkExtractedFilesWithManifest(t *testing.T, testDataDir string) {
-	versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
+func checkExtractedFilesWithManifestAndVersionedHome(t *testing.T, testDataDir string, versionedHome string) {
 	require.DirExists(t, versionedHome, "mapped versioned home directory does not exists")
 	mappedAgentExecutable := filepath.Join(versionedHome, agentName)
 	if assert.FileExistsf(t, mappedAgentExecutable, "agent executable %q is not found in mapped versioned home directory %q", mappedAgentExecutable, versionedHome) {
@@ -498,6 +497,11 @@ func checkExtractedFilesWithManifest(t *testing.T, testDataDir string) {
 			assert.Equal(t, ea_123_manifest, string(fileBytes), "package manifest content does not match")
 		}
 	}
+}
+
+func checkExtractedFilesWithManifest(t *testing.T, testDataDir string) {
+	versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
+	checkExtractedFilesWithManifestAndVersionedHome(t, testDataDir, versionedHome)
 }
 
 func checkFilesPresence(t *testing.T, testDataDir string, requiredFiles, unwantedFiles []string) {
