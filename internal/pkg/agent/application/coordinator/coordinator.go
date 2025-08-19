@@ -231,6 +231,10 @@ type configReloader interface {
 	Reload(*config.Config) error
 }
 
+type secretRedactor interface {
+	AddSecretMarkers(*config.Config) error
+}
+
 // Coordinator manages the entire state of the Elastic Agent.
 //
 // All configuration changes, update variables, and upgrade actions are managed and controlled by the coordinator.
@@ -357,6 +361,8 @@ type Coordinator struct {
 	// run a ticker that checks to see if we have a new PID.
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
+
+	secretRedactor secretRedactor
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -476,7 +482,8 @@ func New(
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
 
-		fleetAcker: fleetAcker,
+		fleetAcker:     fleetAcker,
+		secretRedactor: &diagnostics.SecretsRedactor{},
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -1473,6 +1480,10 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 
 	if err = info.InjectAgentConfig(cfg); err != nil {
 		return err
+	}
+
+	if err = c.secretRedactor.AddSecretMarkers(cfg); err != nil {
+		return fmt.Errorf("failed to add secret markers: %w", err)
 	}
 
 	// perform and verify ast translation

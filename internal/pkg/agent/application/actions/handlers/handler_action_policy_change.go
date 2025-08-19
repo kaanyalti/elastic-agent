@@ -10,6 +10,8 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 
 	"gopkg.in/yaml.v2"
@@ -20,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -99,6 +102,22 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 
 	// // Cache signature validation key for the next policy handling
 	// h.signatureValidationKey = signatureValidationKey
+
+	// marshal action.Data.Policy into yaml and save it into a file in home
+	homePath := paths.Home()
+	if homePath != "" {
+		yamlBytes, err := yaml.Marshal(action.Data.Policy)
+		if err != nil {
+			h.log.Warnf("failed to marshal policy to yaml: %v", err)
+		} else {
+			filePath := filepath.Join(homePath, "policy-straight_from_fleet.yaml")
+			if err := os.WriteFile(filePath, yamlBytes, 0600); err != nil {
+				h.log.Warnf("failed to write policy yaml to file: %v", err)
+			}
+		}
+	} else {
+		h.log.Warn("config.Paths.Home is empty, cannot write policy yaml file")
+	}
 
 	c, err := config.NewConfigFrom(action.Data.Policy)
 	if err != nil {

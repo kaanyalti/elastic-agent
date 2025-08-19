@@ -356,22 +356,42 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
 // since the diagnostic interface is a bit of a free-for-all
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
+func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool) map[K]interface{} {
 	if inputMap == nil {
 		return nil
 	}
 	for rootKey, rootValue := range inputMap {
+		if keyString, ok := any(rootKey).(string); ok {
+			if strings.Contains(keyString, "mark_redact_") {
+				fmt.Printf("keyString: %s\nvalue: %v\n", keyString, rootValue)
+			}
+		}
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
 			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast)
+				rootValue = redactMap(errOut, cast, sliceElem)
 			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast)
+				rootValue = redactMap(errOut, cast, sliceElem)
 			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast)
+				rootValue = redactMap(errOut, cast, sliceElem)
+			case []interface{}:
+				// Recursively process each element in the slice so that we also walk
+				// through lists (e.g. inputs[4].streams[0]). This is required to
+				// reach redaction markers that are inside array items.
+				for i, value := range cast {
+					switch m := value.(type) {
+					case map[string]interface{}:
+						cast[i] = redactMap(errOut, m, true)
+					case map[interface{}]interface{}:
+						cast[i] = redactMap(errOut, m, true)
+					case map[int]interface{}:
+						cast[i] = redactMap(errOut, m, true)
+					}
+				}
+				rootValue = cast
 			case string:
 				if keyString, ok := any(rootKey).(string); ok {
-					if redactKey(keyString) {
+					if redactKey(keyString) && !sliceElem {
 						rootValue = REDACTED
 					}
 				}
@@ -588,7 +608,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 
 // Redact redacts sensitive values from the passed mapStr.
 func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, RedactSecretPaths(mapStr, errOut))
+	return redactMap(errOut, RedactSecretPaths(mapStr, errOut), false)
 }
 
 // RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
@@ -628,4 +648,76 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 		return mapStr
 	}
 	return result
+}
+
+type SecretsRedactor struct {
+}
+
+func (r *SecretsRedactor) AddSecretMarkers(cfg *config.Config) error {
+	secretPaths, err := r.getSecretPaths(cfg)
+	if err != nil {
+		return err
+	}
+
+	return r.addSecretMarkers(cfg, secretPaths)
+}
+
+func (r *SecretsRedactor) getSecretPaths(cfg *config.Config) ([]string, error) {
+	if !cfg.Agent.HasField("secret_paths") {
+		return nil, errors.New("secret_paths field not found")
+	}
+
+	secretPaths, err := cfg.Agent.Child("secret_paths", -1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret_paths: %w", err)
+	}
+
+	if !secretPaths.IsArray() {
+		return nil, fmt.Errorf("secret_paths is not an array: %v", secretPaths)
+	}
+
+	res := []string{}
+	if err := secretPaths.Unpack(&res); err != nil {
+		return nil, fmt.Errorf("failed to unpack secret_paths: %w", err)
+	}
+
+	return res, nil
+}
+
+const redactionMarkerPrefix = "mark_redact_"
+
+func (r *SecretsRedactor) addSecretMarkers(cfg *config.Config, secretPaths []string) error {
+	var aggregateError error
+
+	for _, sp := range secretPaths {
+		ok, err := cfg.Agent.Has(sp, -1, ucfg.PathSep("."))
+		if err != nil {
+			aggregateError = errors.Join(aggregateError, fmt.Errorf("failed to check if %s exists: %w", sp, err))
+			continue
+		}
+
+		if !ok {
+			aggregateError = errors.Join(aggregateError, fmt.Errorf("secret path %s does not exist", sp))
+			continue
+		}
+
+		lastPathSep := strings.LastIndex(sp, ".")
+		parentPath := sp[:lastPathSep]
+		keyName := sp[lastPathSep+1:]
+
+		secretKeyName := redactionMarkerPrefix + keyName
+		secretKeyPath := parentPath + "." + secretKeyName
+
+		if err := cfg.Agent.SetBool(secretKeyPath, -1, true, ucfg.PathSep(".")); err != nil {
+			aggregateError = errors.Join(aggregateError, fmt.Errorf("failed to set %s: %w", secretKeyPath, err))
+			continue
+		}
+	}
+
+	return aggregateError
+}
+
+func (r *SecretsRedactor) RedactMarkedSecret(cfg *config.Config, secretPaths []string) error {
+	// TODO: IMPLEMENT THIS
+	return nil
 }
