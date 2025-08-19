@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -23,8 +24,10 @@ type action struct {
 }
 
 func main() {
-	policyPath := "/Users/kaanyalti/repos/elastic-agent/internal/pkg/diagnostics/experiment/components-expected.yaml"
-	contents, err := os.ReadFile(policyPath)
+	base := "/Users/kaanyalti/repos/elastic-agent-worktrees/fix/5871_add_redaction_keys/internal/pkg/diagnostics/experiment"
+	fileName := "components-expected"
+	filePath := filepath.Join(base, "withmarkers", fileName+".yaml")
+	contents, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to read policy file: %v\n", err)
 		os.Exit(1)
@@ -63,7 +66,8 @@ func main() {
 	// fmt.Println(string(yamlBytes))
 
 	// Write yamlBytes to a file, overwriting if it already exists
-	outputFile := "/Users/kaanyalti/repos/elastic-agent/internal/pkg/diagnostics/experiment/pre-config-experiment.yaml"
+	outBase := filepath.Join(base, "output")
+	outputFile := filepath.Join(outBase, fileName+"-out.yaml")
 	if err := os.WriteFile(outputFile, yamlBytes, 0777); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to write agentMap to file: %v\n", err)
 		os.Exit(1)
@@ -93,10 +97,13 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 	if inputMap == nil {
 		return nil
 	}
+
+	redactionMarkers := []string{}
 	for rootKey, rootValue := range inputMap {
 		if keyString, ok := any(rootKey).(string); ok {
 			if strings.Contains(keyString, "mark_redact_") {
-				fmt.Printf("keyString: %s\nvalue: %v\n", keyString, rootValue)
+				// fmt.Printf("keyString: %s\nvalue: %v\n", keyString, rootValue)
+				redactionMarkers = append(redactionMarkers, keyString)
 			}
 		}
 		if rootValue != nil {
@@ -115,10 +122,13 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 					switch m := value.(type) {
 					case map[string]interface{}:
 						cast[i] = redactMap(errOut, m, true)
+						// cast[i] = redactMap(errOut, m, sliceElem)
 					case map[interface{}]interface{}:
 						cast[i] = redactMap(errOut, m, true)
+						// cast[i] = redactMap(errOut, m, sliceElem)
 					case map[int]interface{}:
 						cast[i] = redactMap(errOut, m, true)
+						// cast[i] = redactMap(errOut, m, sliceElem)
 					}
 				}
 				rootValue = cast
@@ -140,7 +150,43 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 		inputMap[rootKey] = rootValue
 
 	}
+
+	for _, redactionMarker := range redactionMarkers {
+		fmt.Printf("inputMap: %v\n", inputMap)
+		keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
+		for _, v := range inputMap {
+			switch v.(type) {
+			case map[string]interface{}:
+				cfg := ucfg.MustNewFrom(v, ucfg.PathSep("."))
+				ok, err := cfg.Has(keyToRedact, -1, ucfg.PathSep("."))
+				if err != nil {
+					fmt.Fprintf(errOut, "failed to check if %s exists: %v\n", keyToRedact, err)
+				}
+				if !ok {
+					fmt.Fprintf(errOut, "key %s does not exist\n", keyToRedact)
+				} else {
+					cfg.IsDict()
+					cfg.SetString(keyToRedact, -1, "REDACTED", ucfg.PathSep("."))
+				}
+			}
+
+		}
+		// fmt.Printf("cfg: %v\n", cfg)
+		// err = cfg.Unpack(&inputMap)
+		// if err != nil {
+		// 	fmt.Fprintf(errOut, "failed to unpack cfg: %v\n", err)
+		// }
+	}
+
 	return inputMap
+}
+
+func setLeafValue[K comparable](inputMap map[K]interface{}, key string, value string) {
+	for k, v := range inputMap {
+		if k == key {
+			inputMap[k] = value
+		}
+	}
 }
 
 type SecretsRedactor struct {
