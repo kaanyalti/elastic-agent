@@ -1483,7 +1483,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 
 	if err = c.secretRedactor.AddSecretMarkers(cfg); err != nil {
-		return fmt.Errorf("failed to add secret markers: %w", err)
+		return fmt.Errorf("failed to add secret markers: %w", err) // TODO: log error do not return error
 	}
 
 	// perform and verify ast translation

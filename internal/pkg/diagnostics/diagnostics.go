@@ -356,14 +356,71 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
 // since the diagnostic interface is a bit of a free-for-all
+// func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool) map[K]interface{} {
+// 	if inputMap == nil {
+// 		return nil
+// 	}
+// 	for rootKey, rootValue := range inputMap {
+// 		if keyString, ok := any(rootKey).(string); ok {
+// 			if strings.Contains(keyString, "mark_redact_") {
+// 				fmt.Printf("keyString: %s\nvalue: %v\n", keyString, rootValue)
+// 			}
+// 		}
+// 		if rootValue != nil {
+// 			switch cast := rootValue.(type) {
+// 			case map[string]interface{}:
+// 				rootValue = redactMap(errOut, cast, sliceElem)
+// 			case map[interface{}]interface{}:
+// 				rootValue = redactMap(errOut, cast, sliceElem)
+// 			case map[int]interface{}:
+// 				rootValue = redactMap(errOut, cast, sliceElem)
+// 			case []interface{}:
+// 				// Recursively process each element in the slice so that we also walk
+// 				// through lists (e.g. inputs[4].streams[0]). This is required to
+// 				// reach redaction markers that are inside array items.
+// 				for i, value := range cast {
+// 					switch m := value.(type) {
+// 					case map[string]interface{}:
+// 						cast[i] = redactMap(errOut, m, true)
+// 					case map[interface{}]interface{}:
+// 						cast[i] = redactMap(errOut, m, true)
+// 					case map[int]interface{}:
+// 						cast[i] = redactMap(errOut, m, true)
+// 					}
+// 				}
+// 				rootValue = cast
+// 			case string:
+// 				if keyString, ok := any(rootKey).(string); ok {
+// 					if redactKey(keyString) && !sliceElem {
+// 						rootValue = REDACTED
+// 					}
+// 				}
+// 			default:
+// 				// in cases where we got some weird kind of map we couldn't parse, print a warning
+// 				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
+// 					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
+// 				}
+
+// 			}
+// 		}
+
+// 		inputMap[rootKey] = rootValue
+
+// 	}
+// 	return inputMap
+// }
+
 func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool) map[K]interface{} {
 	if inputMap == nil {
 		return nil
 	}
+
+	redactionMarkers := []string{}
 	for rootKey, rootValue := range inputMap {
 		if keyString, ok := any(rootKey).(string); ok {
+			// Find siblings that have the redaction marker.
 			if strings.Contains(keyString, "mark_redact_") {
-				fmt.Printf("keyString: %s\nvalue: %v\n", keyString, rootValue)
+				redactionMarkers = append(redactionMarkers, keyString)
 			}
 		}
 		if rootValue != nil {
@@ -377,7 +434,8 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 			case []interface{}:
 				// Recursively process each element in the slice so that we also walk
 				// through lists (e.g. inputs[4].streams[0]). This is required to
-				// reach redaction markers that are inside array items.
+				// reach redaction markers that are inside array items. Set SliceElem to true
+				// to avoid global redaction of array elements.
 				for i, value := range cast {
 					switch m := value.(type) {
 					case map[string]interface{}:
@@ -403,10 +461,26 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 
 			}
 		}
-
 		inputMap[rootKey] = rootValue
-
 	}
+
+	cfgToRedact := ucfg.MustNewFrom(inputMap, ucfg.PathSep("."))
+	for _, redactionMarker := range redactionMarkers {
+		keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
+		sourcePath := keyToRedact + ".kind.stringvalue"               // structure in unpacked ucfg mapstr
+		ok, err := cfgToRedact.Has(sourcePath, -1, ucfg.PathSep(".")) // first check if the nested field exists
+		if err != nil {
+			fmt.Fprintf(errOut, "failed to check if %s exists: %v\n", sourcePath, err)
+		}
+		if ok {
+			cfgToRedact.SetString(sourcePath, -1, REDACTED, ucfg.PathSep(".")) // if the nested field exists, redact it
+		} else {
+			cfgToRedact.SetString(keyToRedact, -1, REDACTED, ucfg.PathSep(".")) // if the nested field does not exist, then the value is in the parent field
+		}
+	}
+
+	cfgToRedact.Unpack(&inputMap)
+
 	return inputMap
 }
 
@@ -608,7 +682,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 
 // Redact redacts sensitive values from the passed mapStr.
 func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, RedactSecretPaths(mapStr, errOut), false)
+	return redactMap(errOut, mapStr, false)
 }
 
 // RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
