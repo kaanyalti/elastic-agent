@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -24,8 +25,8 @@ type action struct {
 }
 
 func main() {
-	base := "/Users/kaanyalti/repos/elastic-agent-worktrees/fix/5871_add_redaction_keys/internal/pkg/diagnostics/experiment"
-	fileName := "testfile"
+	base := "../experiment"
+	fileName := "components-actual"
 	filePath := filepath.Join(base, "withmarkers", fileName+".yaml")
 	contents, err := os.ReadFile(filePath)
 	if err != nil {
@@ -53,7 +54,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Add a time.Time value to reproduce the reflect panic
+	// This simulates what happens in real diagnostics where build_time is a time.Time struct
+	agentMap["build_time"] = time.Date(2025, 8, 22, 16, 7, 19, 0, time.UTC)
+	agentMap["mark_redact_test"] = true
+
 	fmt.Println("================================================")
+	fmt.Println("About to call redactMap with time.Time value...")
 	redactMap(os.Stdout, agentMap, false)
 	fmt.Println("================================================")
 
@@ -189,22 +196,27 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 		inputMap[rootKey] = rootValue
 	}
 
-	cfgToRedact := ucfg.MustNewFrom(inputMap, ucfg.PathSep("."))
-	for _, redactionMarker := range redactionMarkers {
-		keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
-		sourcePath := keyToRedact + ".kind.stringvalue"               // structure in unpacked ucfg mapstr
-		ok, err := cfgToRedact.Has(sourcePath, -1, ucfg.PathSep(".")) // first check if the nested field exists
-		if err != nil {
-			fmt.Fprintf(errOut, "failed to check if %s exists: %v\n", sourcePath, err)
-		}
-		if ok {
-			cfgToRedact.SetString(sourcePath, -1, "REDACTED", ucfg.PathSep(".")) // if the nested field exists, redact it
-		} else {
-			cfgToRedact.SetString(keyToRedact, -1, "REDACTED", ucfg.PathSep(".")) // if the nested field does not exist, then the value is in the parent field
-		}
-	}
+	// cfgToRedact := ucfg.MustNewFrom(inputMap, ucfg.PathSep("."))
+	// for _, redactionMarker := range redactionMarkers {
+	// 	keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
+	// 	sourcePath := keyToRedact + ".kind.stringvalue"               // structure in unpacked ucfg mapstr
+	// 	ok, err := cfgToRedact.Has(sourcePath, -1, ucfg.PathSep(".")) // first check if the nested field exists
+	// 	if err != nil {
+	// 		fmt.Fprintf(errOut, "failed to check if %s exists: %v\n", sourcePath, err)
+	// 	}
+	// 	if ok {
+	// 		fmt.Fprintf(errOut, "redacting %s\n", sourcePath)
+	// 		cfgToRedact.SetString(sourcePath, -1, "REDACTED", ucfg.PathSep(".")) // if the nested field exists, redact it
+	// 	} else {
+	// 		fmt.Fprintf(errOut, "redacting %s\n", keyToRedact)
+	// 		cfgToRedact.SetString(keyToRedact, -1, "REDACTED", ucfg.PathSep(".")) // if the nested field does not exist, then the value is in the parent field
+	// 	}
+	// }
 
-	cfgToRedact.Unpack(&inputMap)
+	// cfgToRedact.Unpack(&inputMap)
+	for _, redactionMarker := range redactionMarkers {
+		redactWithMarker(inputMap, redactionMarker, false)
+	}
 
 	return inputMap
 }

@@ -410,6 +410,48 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 // 	return inputMap
 // }
 
+func redactWithMarker[K comparable](inputMap map[K]interface{}, marker string, keyFound bool) map[K]interface{} {
+	keyToRedact := strings.TrimPrefix(marker, "mark_redact_")
+	fmt.Println("keyToRedact: ", keyToRedact)
+	for rootKey, rootValue := range inputMap {
+		keyString, ok := any(rootKey).(string)
+		if ok {
+			if keyString == keyToRedact {
+				keyFound = true
+			}
+		}
+
+		fmt.Printf("keyString: %s, keyToRedact: %s\n", keyString, keyToRedact)
+		switch cast := rootValue.(type) {
+		case map[string]interface{}:
+			redactWithMarker(cast, marker, keyFound)
+		case map[interface{}]interface{}:
+			redactWithMarker(cast, marker, keyFound)
+		case map[int]interface{}:
+			redactWithMarker(cast, marker, keyFound)
+		case []interface{}:
+			for i, value := range cast {
+				switch m := value.(type) {
+				case map[string]interface{}:
+					cast[i] = redactWithMarker(m, marker, keyFound)
+				case map[interface{}]interface{}:
+					cast[i] = redactWithMarker(m, marker, keyFound)
+				case map[int]interface{}:
+					cast[i] = redactWithMarker(m, marker, keyFound)
+				}
+			}
+		case string:
+			if keyFound {
+				inputMap[rootKey] = "REDACTED"
+			}
+		}
+		if keyFound {
+			break
+		}
+	}
+	return inputMap
+}
+
 func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool) map[K]interface{} {
 	if inputMap == nil {
 		return nil
@@ -464,25 +506,80 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 		inputMap[rootKey] = rootValue
 	}
 
-	cfgToRedact := ucfg.MustNewFrom(inputMap, ucfg.PathSep("."))
 	for _, redactionMarker := range redactionMarkers {
 		keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
-		sourcePath := keyToRedact + ".kind.stringvalue"               // structure in unpacked ucfg mapstr
-		ok, err := cfgToRedact.Has(sourcePath, -1, ucfg.PathSep(".")) // first check if the nested field exists
-		if err != nil {
-			fmt.Fprintf(errOut, "failed to check if %s exists: %v\n", sourcePath, err)
-		}
-		if ok {
-			cfgToRedact.SetString(sourcePath, -1, REDACTED, ucfg.PathSep(".")) // if the nested field exists, redact it
-		} else {
-			cfgToRedact.SetString(keyToRedact, -1, REDACTED, ucfg.PathSep(".")) // if the nested field does not exist, then the value is in the parent field
+		for rootKey := range inputMap {
+			if keyString, ok := any(rootKey).(string); ok {
+				if keyString == keyToRedact {
+					inputMap[rootKey] = REDACTED
+				}
+			}
 		}
 	}
 
-	cfgToRedact.Unpack(&inputMap)
-
 	return inputMap
 }
+
+// func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool, redactionMarker string, foundKey bool) map[K]interface{} {
+// 	if inputMap == nil {
+// 		return nil
+// 	}
+
+// 	redactionMarkers := []string{}
+// 	for rootKey, rootValue := range inputMap {
+// 		if keyString, ok := any(rootKey).(string); ok {
+// 			// Find siblings that have the redaction marker.
+// 			if strings.Contains(keyString, "mark_redact_") {
+// 				redactionMarkers = append(redactionMarkers, keyString)
+// 			}
+// 		}
+// 		if rootValue != nil {
+// 			switch cast := rootValue.(type) {
+// 			case map[string]interface{}:
+// 				rootValue = redactMap(errOut, cast, sliceElem, redactionMarker, foundKey)
+// 			case map[interface{}]interface{}:
+// 				rootValue = redactMap(errOut, cast, sliceElem, redactionMarker, foundKey)
+// 			case map[int]interface{}:
+// 				rootValue = redactMap(errOut, cast, sliceElem, redactionMarker, foundKey)
+// 			case []interface{}:
+// 				// Recursively process each element in the slice so that we also walk
+// 				// through lists (e.g. inputs[4].streams[0]). This is required to
+// 				// reach redaction markers that are inside array items. Set SliceElem to true
+// 				// to avoid global redaction of array elements.
+// 				for i, value := range cast {
+// 					switch m := value.(type) {
+// 					case map[string]interface{}:
+// 						cast[i] = redactMap(errOut, m, true, redactionMarker, foundKey)
+// 					case map[interface{}]interface{}:
+// 						cast[i] = redactMap(errOut, m, true, redactionMarker, foundKey)
+// 					case map[int]interface{}:
+// 						cast[i] = redactMap(errOut, m, true, redactionMarker, foundKey)
+// 					}
+// 				}
+// 				rootValue = cast
+// 			case string:
+// 				if keyString, ok := any(rootKey).(string); ok {
+// 					if redactKey(keyString) && !sliceElem {
+// 						rootValue = REDACTED
+// 					}
+// 				}
+// 			default:
+// 				// in cases where we got some weird kind of map we couldn't parse, print a warning
+// 				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
+// 					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
+// 				}
+
+// 			}
+// 		}
+// 		inputMap[rootKey] = rootValue
+// 	}
+
+// 	for _, redactionMarker := range redactionMarkers {
+
+// 	}
+
+// 	return inputMap
+// }
 
 func redactKey(k string) bool {
 	// "routekey" shouldn't be redacted.
