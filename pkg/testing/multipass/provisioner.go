@@ -143,9 +143,9 @@ func (p *provisioner) launch(ctx context.Context, cfg common.Config, batch commo
 	}
 	args := []string{
 		"launch",
-		"-c", "2",
+		"-c", "4",
 		"-d", "50G", // need decent size for all the tests
-		"-m", "4G",
+		"-m", "12G",
 		"-n", batch.ID,
 		"--cloud-init", "-",
 		batch.OS.Version,

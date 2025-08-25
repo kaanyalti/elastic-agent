@@ -26,7 +26,7 @@ type action struct {
 
 func main() {
 	base := "../experiment"
-	fileName := "components-actual"
+	fileName := "testfile"
 	filePath := filepath.Join(base, "withmarkers", fileName+".yaml")
 	contents, err := os.ReadFile(filePath)
 	if err != nil {
