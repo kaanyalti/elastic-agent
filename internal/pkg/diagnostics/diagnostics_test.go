@@ -776,10 +776,9 @@ func TestAddRedactionMarkers(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			redactor := SecretsRedactor{}
 			cfg := config.MustNewConfigFrom(tc.input)
 
-			err := redactor.AddSecretMarkers(cfg)
+			err := AddSecretMarkers(cfg)
 			if tc.expectedErrMsg != "" {
 				assert.Error(t, err)
 				require.ErrorContains(t, err, tc.expectedErrMsg)

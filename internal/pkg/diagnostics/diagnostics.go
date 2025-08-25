@@ -476,8 +476,8 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 			case []interface{}:
 				// Recursively process each element in the slice so that we also walk
 				// through lists (e.g. inputs[4].streams[0]). This is required to
-				// reach redaction markers that are inside array items. Set SliceElem to true
-				// to avoid global redaction of array elements.
+				// reach redaction markers that are inside slice items. Set SliceElem to true
+				// to avoid global redaction of slice elements.
 				for i, value := range cast {
 					switch m := value.(type) {
 					case map[string]interface{}:
@@ -519,67 +519,6 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 
 	return inputMap
 }
-
-// func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool, redactionMarker string, foundKey bool) map[K]interface{} {
-// 	if inputMap == nil {
-// 		return nil
-// 	}
-
-// 	redactionMarkers := []string{}
-// 	for rootKey, rootValue := range inputMap {
-// 		if keyString, ok := any(rootKey).(string); ok {
-// 			// Find siblings that have the redaction marker.
-// 			if strings.Contains(keyString, "mark_redact_") {
-// 				redactionMarkers = append(redactionMarkers, keyString)
-// 			}
-// 		}
-// 		if rootValue != nil {
-// 			switch cast := rootValue.(type) {
-// 			case map[string]interface{}:
-// 				rootValue = redactMap(errOut, cast, sliceElem, redactionMarker, foundKey)
-// 			case map[interface{}]interface{}:
-// 				rootValue = redactMap(errOut, cast, sliceElem, redactionMarker, foundKey)
-// 			case map[int]interface{}:
-// 				rootValue = redactMap(errOut, cast, sliceElem, redactionMarker, foundKey)
-// 			case []interface{}:
-// 				// Recursively process each element in the slice so that we also walk
-// 				// through lists (e.g. inputs[4].streams[0]). This is required to
-// 				// reach redaction markers that are inside array items. Set SliceElem to true
-// 				// to avoid global redaction of array elements.
-// 				for i, value := range cast {
-// 					switch m := value.(type) {
-// 					case map[string]interface{}:
-// 						cast[i] = redactMap(errOut, m, true, redactionMarker, foundKey)
-// 					case map[interface{}]interface{}:
-// 						cast[i] = redactMap(errOut, m, true, redactionMarker, foundKey)
-// 					case map[int]interface{}:
-// 						cast[i] = redactMap(errOut, m, true, redactionMarker, foundKey)
-// 					}
-// 				}
-// 				rootValue = cast
-// 			case string:
-// 				if keyString, ok := any(rootKey).(string); ok {
-// 					if redactKey(keyString) && !sliceElem {
-// 						rootValue = REDACTED
-// 					}
-// 				}
-// 			default:
-// 				// in cases where we got some weird kind of map we couldn't parse, print a warning
-// 				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
-// 					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
-// 				}
-
-// 			}
-// 		}
-// 		inputMap[rootKey] = rootValue
-// 	}
-
-// 	for _, redactionMarker := range redactionMarkers {
-
-// 	}
-
-// 	return inputMap
-// }
 
 func redactKey(k string) bool {
 	// "routekey" shouldn't be redacted.
@@ -782,58 +721,20 @@ func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
 	return redactMap(errOut, mapStr, false)
 }
 
-// RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
-// If found it will replace the value for every key in the paths list with <REDACTED> and return the resulting map.
-// Any issues or errors will be written to the errOut writer.
-func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
-	v, ok := mapStr["secret_paths"]
-	if !ok {
-		return mapStr
-	}
-	arr, ok := v.([]interface{})
-	if !ok {
-		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
-		return mapStr
-	}
-	cfg := ucfg.MustNewFrom(mapStr, ucfg.PathSep("."))
-	for _, v := range arr {
-		key, ok := v.(string)
-		if !ok {
-			fmt.Fprintf(errOut, "No output redaction for %q: expected type string, is type %T.\n", v, v)
-			continue
-		}
-
-		if ok, err := cfg.Has(key, -1, ucfg.PathSep(".")); err != nil {
-			fmt.Fprintf(errOut, "Error redacting secret path %q: %v.\n", key, err)
-		} else if ok {
-			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
-			if err != nil {
-				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
-			}
-		} else {
-			fmt.Fprintf(errOut, "Unable to find secret path %q for redaction.\n", key)
-		}
-	}
-	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
-	if err != nil {
-		return mapStr
-	}
-	return result
-}
-
-type SecretsRedactor struct {
-}
-
-func (r *SecretsRedactor) AddSecretMarkers(cfg *config.Config) error {
-	secretPaths, err := r.getSecretPaths(cfg)
+// AddSecretMarkers adds secret redaction markers to the config by looking at the secret_paths field.
+// It will add a marker to the config for each secret path.
+// The marker is added to the config as a boolean field with the name of the
+// secret path prefixed with "mark_redact_".
+func AddSecretMarkers(cfg *config.Config) error {
+	secretPaths, err := getSecretPaths(cfg)
 	if err != nil {
 		return err
 	}
 
-	return r.addSecretMarkers(cfg, secretPaths)
+	return addSecretMarkers(cfg, secretPaths)
 }
 
-func (r *SecretsRedactor) getSecretPaths(cfg *config.Config) ([]string, error) {
+func getSecretPaths(cfg *config.Config) ([]string, error) {
 	if !cfg.Agent.HasField("secret_paths") {
 		return nil, errors.New("secret_paths field not found")
 	}
@@ -857,7 +758,7 @@ func (r *SecretsRedactor) getSecretPaths(cfg *config.Config) ([]string, error) {
 
 const redactionMarkerPrefix = "mark_redact_"
 
-func (r *SecretsRedactor) addSecretMarkers(cfg *config.Config, secretPaths []string) error {
+func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 	var aggregateError error
 
 	for _, sp := range secretPaths {
@@ -886,9 +787,4 @@ func (r *SecretsRedactor) addSecretMarkers(cfg *config.Config, secretPaths []str
 	}
 
 	return aggregateError
-}
-
-func (r *SecretsRedactor) RedactMarkedSecret(cfg *config.Config, secretPaths []string) error {
-	// TODO: IMPLEMENT THIS
-	return nil
 }
